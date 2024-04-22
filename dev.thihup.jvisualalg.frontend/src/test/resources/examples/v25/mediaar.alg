@@ -3,7 +3,8 @@ Algoritmo "mediaarit"
 // Algoritmo : MEDIA ARITMETICA (O famoso...)
 // Função : Demonstração para o programa VisuAlg
 // Autor : Cláudio M. de Souza
-// Data : 08/09/2002// Seção de Declarações
+// Data : 08/09/2002
+// Seção de Declarações
 var
    V1, V2, Media : real ;
 inicio

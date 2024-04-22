@@ -3,7 +3,8 @@ Algoritmo "Invertenome"
 // Professor: Antonio Carlos Nicolodi
 // Função: Calcula os passos de um caracol para subir o poço
 // Autor    : Antonio Carlos Nicolodi
-// Data     : 05/04/2015 // Função :
+// Data     : 05/04/2015
+// Função :
 // Autor :
 // Data : 09/04/2015
 // Seção de Declarações 

@@ -10,13 +10,27 @@ import java.util.stream.Stream;
 class MainTest {
 
     @ParameterizedTest
-    @MethodSource("examples")
-    void testMain(Path path) throws Throwable {
+    @MethodSource("examplesV25")
+    void testExamplesV25(Path path) throws Throwable {
         Main.parse(path);
     }
 
-    static Stream<Path> examples() throws Throwable {
-        return Files.walk(Path.of("src", "test", "resources", "examples"))
+    @ParameterizedTest
+    @MethodSource("examplesV30")
+    void testExamplesV30(Path path) throws Throwable {
+        Main.parse(path);
+    }
+
+    static Stream<Path> examplesV25() throws Throwable {
+        return examples("v25");
+    }
+
+    static Stream<Path> examplesV30() throws Throwable {
+        return examples("v30");
+    }
+
+    static Stream<Path> examples(String folder) throws Throwable {
+        return Files.walk(Path.of("src", "test", "resources", "examples", folder))
                 .filter(Files::isRegularFile);
     }
 
