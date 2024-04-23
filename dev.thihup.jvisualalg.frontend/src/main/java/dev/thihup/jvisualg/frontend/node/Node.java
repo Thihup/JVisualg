@@ -11,6 +11,12 @@ public sealed interface Node {
     record DeclarationsNode(List<Node> variableDeclarationContexts, List<Node> registroDeclarationContexts, List<Node> subprogramDeclarationContexts, List<Node> constantsDeclarationContexts, List<Node> dosContexts, Location location) implements Node {
     }
 
+    record FunctionDeclarationNode(String name, Node returnType, List<Node> parameters, List<Node> declarations,List<Node> commands, Location location) implements Node {
+    }
+
+    record ProcedureDeclarationNode(String name, List<Node> parameters, List<Node> declarations,List<Node> commands, Location location) implements Node {
+    }
+
     record RegistroDeclarationNode(String name, List<Node> variableDeclarationContexts, Location location) implements Node {
     }
 
@@ -58,10 +64,16 @@ public sealed interface Node {
     record DosNode(Location location) implements Node {
     }
 
+    record IncrementNode(Node expr, Node value, Location location) implements Node {
+    }
+
     record AssignmentNode(Node idOrArray, Node expr, Location location) implements Node {
     }
 
-    record IdOrArrayNode(String id, List<Node> indexes, Location location) implements Node {
+    record IdNode(String id, Location location) implements Node {
+    }
+
+    record ArrayAccessNode(IdNode node, List<Node> indexes, Location location) implements Node {
     }
 
     record ReadCommandNode(List<Node> exprList, Location location) implements Node {
@@ -70,7 +82,7 @@ public sealed interface Node {
     record WriteCommandNode(boolean newLine, List<Node> writeList, Location location) implements Node {
     }
 
-    record WriteItemNode(Node expr, String format, Location location) implements Node {
+    record WriteItemNode(Node expr, Integer spaces, Integer precision, Location location) implements Node {
     }
 
     record ConditionalCommandNode(Node expr, List<Node> commands, List<Node> elseCommands, Location location) implements Node {
@@ -79,11 +91,80 @@ public sealed interface Node {
     record ChooseCommandNode(Node expr, List<Node> cases, Node defaultCase, Location location) implements Node {
     }
 
-    record LoopCommandNode(Node id, Node start, Node end, Node step, List<Node> commands, Location location) implements Node {
+    record ChooseCaseNode(Node value, List<Node> commands, Location location) implements Node {
+    }
+
+    record WhileCommandNode(Node test, List<Node> commands, boolean conditionAtEnd, Location location) implements Node {
+    }
+
+    record ForCommandNode(Node start, Node test, Node step, List<Node> commands, Location location) implements Node {
     }
 
     record SubprogramCallNode(String name, List<Node> args, Location location) implements Node {
     }
+
+    sealed interface BinaryNode extends Node {
+        Node left();
+
+        Node right();
+    }
+
+    record AddNode(Node left, Node right, Location location) implements BinaryNode {
+    }
+
+    record SubNode(Node left, Node right, Location location) implements BinaryNode {
+    }
+
+    record MulNode(Node left, Node right, Location location) implements BinaryNode {
+    }
+
+    record DivNode(Node left, Node right, Location location) implements BinaryNode {
+    }
+
+    record ModNode(Node left, Node right, Location location) implements BinaryNode {
+    }
+
+    record PowNode(Node left, Node right, Location location) implements BinaryNode {
+    }
+
+    sealed interface BooleanNode extends Node {}
+
+    record AndNode(Node left, Node right, Location location) implements BooleanNode, BinaryNode {
+    }
+
+    record OrNode(Node left, Node right, Location location) implements BooleanNode, BinaryNode {
+    }
+
+    record NotNode(Node expr, Location location) implements BooleanNode {
+    }
+
+    sealed interface RelationalNode extends BinaryNode {}
+
+    record EqNode(Node left, Node right, Location location) implements RelationalNode {
+    }
+
+    record NeNode(Node left, Node right, Location location) implements RelationalNode {
+    }
+
+    record LtNode(Node left, Node right, Location location) implements RelationalNode {
+    }
+
+    record LeNode(Node left, Node right, Location location) implements RelationalNode {
+    }
+
+    record GtNode(Node left, Node right, Location location) implements RelationalNode {
+    }
+
+    record GeNode(Node left, Node right, Location location) implements RelationalNode {
+    }
+
+    record NegNode(Node expr, Location location) implements Node {
+    }
+
+    record PosNode(Node expr, Location location) implements Node {
+    }
+
+
 
     record ArquivoCommandNode(String name, Location location) implements Node {
     }
@@ -109,4 +190,6 @@ public sealed interface Node {
     record LimpatelaCommandNode(Location location) implements Node {
     }
 
+    record ArrayTypeNode(TypeNode type, long dimensions, List<Node> sizes, Location location) implements Node {
+    }
 }

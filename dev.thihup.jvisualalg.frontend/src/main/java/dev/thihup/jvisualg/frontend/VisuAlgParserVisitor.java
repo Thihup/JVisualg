@@ -8,6 +8,7 @@ import dev.thihup.jvisualg.frontend.node.Node.*;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
@@ -28,6 +29,52 @@ public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         return new DeclarationsNode(variableDeclarationContexts, registroDeclarationContexts, subprogramDeclarationContexts, constantsDeclarationContexts, dosContexts, Location.fromRuleContext(ctx));
     }
 
+
+    @Override
+    public Node visitSubprogramDeclaration(VisuAlgParser.SubprogramDeclarationContext ctx) {
+        VisuAlgParser.FunctionDeclarationContext functionDeclarationContext = ctx.functionDeclaration();
+        if (functionDeclarationContext != null) {
+            return visit(functionDeclarationContext);
+        }
+        if (ctx.procedureDeclaration() != null) {
+            return visit(ctx.procedureDeclaration());
+        }
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Node visitFormalParameter(VisuAlgParser.FormalParameterContext ctx) {
+        return new CompundNode(ctx.ID().stream().map(TerminalNode::getText).map(x -> new VariableDeclarationNode(x, visit(ctx.type()), Location.fromRuleContext(ctx))).toList(), null);
+    }
+
+    @Override
+    public Node visitProcedureDeclaration(VisuAlgParser.ProcedureDeclarationContext ctx) {
+        List<Node> parameters = ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context ? context.formalParameter().stream().map(this::visit).toList() : List.of();
+        List<Node> declarations = ctx.declarations() instanceof VisuAlgParser.DeclarationsContext context ? context.variableDeclaration().stream().map(this::visit).toList() : List.of();
+        List<Node> commands = ctx.commands() instanceof VisuAlgParser.CommandsContext context ? context.command().stream().map(this::visit).toList() : List.of();
+        return new ProcedureDeclarationNode(
+            ctx.ID().getText(),
+                parameters,
+                declarations,
+                commands,
+            Location.fromRuleContext(ctx)
+        );
+    }
+
+    @Override
+    public Node visitFunctionDeclaration(VisuAlgParser.FunctionDeclarationContext ctx) {
+        List<Node> parameters = ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context ? context.formalParameter().stream().map(this::visit).toList() : List.of();
+        List<Node> declarations = ctx.declarations() instanceof VisuAlgParser.DeclarationsContext context ? context.variableDeclaration().stream().map(this::visit).toList() : List.of();
+        List<Node> commands = ctx.commands() instanceof VisuAlgParser.CommandsContext context ? context.command().stream().map(this::visit).toList() : List.of();
+        return new FunctionDeclarationNode(
+                ctx.ID().getText(),
+                visitType(ctx.type()),
+                parameters,
+                declarations,
+                commands,
+                Location.fromRuleContext(ctx)
+        );
+    }
 
     @Override
     public Node visitRegistroDeclaration(VisuAlgParser.RegistroDeclarationContext ctx) {
@@ -82,9 +129,38 @@ public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitType(VisuAlgParser.TypeContext ctx) {
-        return new TypeNode(ctx.getText(), Location.fromRuleContext(ctx));
+        TerminalNode vetor = ctx.VETOR();
+        if (vetor == null)
+            return new TypeNode(ctx.getText(), Location.fromRuleContext(ctx));
+        List<TerminalNode> range = ctx.RANGE();
+
+
+        List<Node> list = range.stream()
+                .map(this::rangeToNode)
+                .toList();
+        return new ArrayTypeNode((TypeNode) visit(ctx.type()), range.size(), list, Location.fromRuleContext(ctx));
     }
 
+    private Node rangeToNode(TerminalNode ctx) {
+        // range is (number)..(number)  or (number)..(text) or (text)..(number) or (text)..(text)
+        // and the returned node should be a SubNode from the second number to the first number
+        String[] values = ctx.getText().split("\\.\\.");
+        assert values.length == 2;
+        Integer min, max;
+        try {
+            min = Integer.parseInt(values[0]);
+        } catch (NumberFormatException e) {
+            min = null;
+        }
+        try {
+            max = Integer.parseInt(values[1]);
+        } catch (NumberFormatException e) {
+            max = null;
+        }
+
+        return new AddNode(new SubNode(max != null ? new IntLiteralNode(max, null) : new IdNode(values[1], null),
+                min != null ? new IntLiteralNode(min, null) : new IdNode(values[0], null), null), new IntLiteralNode(1, null), null);
+    }
 
     @Override
     public Node visitCommands(VisuAlgParser.CommandsContext ctx) {
@@ -125,22 +201,41 @@ public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitIdOrArray(VisuAlgParser.IdOrArrayContext ctx) {
-        List<Node> indexes = ctx.expr().stream().map(this::visit).toList();
-        return new IdOrArrayNode("????", indexes, Location.fromRuleContext(ctx));
+        List<TerminalNode> id = ctx.ID();
+        List<VisuAlgParser.ExprContext> expr = ctx.expr();
+        IdNode idNode = new IdNode(id.getFirst().getText(), Location.fromRuleContext(ctx));
+        if (expr == null || expr.isEmpty()) {
+            return idNode;
+        }
+        return new ArrayAccessNode(idNode, expr.stream().map(this::visit).toList(), Location.fromRuleContext(ctx));
     }
 
 
     @Override
     public Node visitReadCommand(VisuAlgParser.ReadCommandContext ctx) {
-        List<Node> exprList = ctx.exprList().expr().stream().map(this::visit).toList();
-        return new ReadCommandNode(exprList, Location.fromRuleContext(ctx));
+        List<AssignmentNode> leia = ctx.exprList()
+                .expr()
+                .stream()
+                .map(this::visit)
+                .map(x -> new AssignmentNode(x, new SubprogramCallNode("leia", List.of(), Location.fromRuleContext(ctx)), Location.fromRuleContext(ctx)))
+                .toList();
+
+        if (leia.size() == 1)
+            return leia.getFirst();
+        return new CompundNode(leia, Location.fromRuleContext(ctx));
     }
+
+
 
 
     @Override
     public Node visitWriteCommand(VisuAlgParser.WriteCommandContext ctx) {
         boolean newLine = ctx.ESCREVAL() != null;
-        List<Node> writeList = ctx.writeList().writeItem().stream().map(this::visit).toList();
+        VisuAlgParser.WriteListContext writeListContext = ctx.writeList();
+        if (writeListContext == null) {
+            return new WriteCommandNode(newLine, List.of(), Location.fromRuleContext(ctx));
+        }
+        List<Node> writeList = writeListContext.writeItem().stream().map(this::visit).toList();
         return new WriteCommandNode(newLine, writeList, Location.fromRuleContext(ctx));
     }
 
@@ -148,8 +243,11 @@ public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     @Override
     public Node visitWriteItem(VisuAlgParser.WriteItemContext ctx) {
         Node expr = visit(ctx.expr());
-        String format = ctx.INT_LITERAL().stream().map(TerminalNode::getText).reduce("", (a, b) -> a + b);
-        return new WriteItemNode(expr, format, Location.fromRuleContext(ctx));
+        TerminalNode spaces = ctx.INT_LITERAL(0);
+        TerminalNode precision = ctx.INT_LITERAL(1);
+        Integer spaces1 = spaces != null ? Integer.parseInt(spaces.getText()) : null;
+        Integer precision1 = precision != null ? Integer.parseInt(precision.getText()) : null;
+        return new WriteItemNode(expr, spaces1, precision1, Location.fromRuleContext(ctx));
     }
 
 
@@ -157,46 +255,126 @@ public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     public Node visitConditionalCommand(VisuAlgParser.ConditionalCommandContext ctx) {
         Node expr = visit(ctx.expr().getFirst());
         List<Node> commands = ctx.commands(0).command().stream().map(this::visit).toList();
-        List<Node> elseCommands = ctx.commands(1).command().stream().map(this::visit).toList();
+        VisuAlgParser.CommandsContext commands1 = ctx.commands(1);
+        if (commands1 == null || commands1.command().isEmpty()) {
+            return new ConditionalCommandNode(expr, commands, List.of(), Location.fromRuleContext(ctx));
+        }
+        List<Node> elseCommands = commands1.command().stream().map(this::visit).toList();
         return new ConditionalCommandNode(expr, commands, elseCommands, Location.fromRuleContext(ctx));
     }
 
 
     @Override
     public Node visitChooseCommand(VisuAlgParser.ChooseCommandContext ctx) {
-        throw new UnsupportedOperationException();
+        Node expr = exprsToNode(ctx.expr());
+
+        List<Node> list = ctx.exprOrAte().stream().map(this::visit).toList();
+        TerminalNode outrocaso = ctx.OUTROCASO();
+        if (outrocaso == null) {
+            return new ChooseCommandNode(expr, list, null, Location.fromRuleContext(ctx));
+        }
+        return new ChooseCommandNode(expr, list, visit(outrocaso), Location.fromRuleContext(ctx));
+    }
+
+    Node exprsToNode(List<VisuAlgParser.ExprContext> exprs) {
+        if (exprs.size() == 1) {
+            return visit(exprs.getFirst());
+        }
+        return new CompundNode(exprs.stream().map(this::visit).toList(), Location.fromRuleContext(exprs.getFirst()));
     }
 
 
     @Override
     public Node visitParaCommand(VisuAlgParser.ParaCommandContext ctx) {
-        Node id = visit(ctx.ID());
-        Node start = visit(ctx.expr(0));
-        Node end = visit(ctx.expr(1));
-        Node step = visit(ctx.expr(2));
+        Node visit = visit(ctx.expr(0));
+        IdNode idOrArray = new IdNode(ctx.ID().getText(), Location.fromRuleContext(ctx));
+        Node test = ctx.expr(1) instanceof VisuAlgParser.ExprContext testConditional ? new LeNode(idOrArray, visit(testConditional), null) : new BooleanLiteralNode(false, Location.fromRuleContext(ctx));
+        Node step = ctx.expr(2) instanceof VisuAlgParser.ExprContext stepValue ? new IncrementNode(idOrArray, visit(stepValue), null) : new IncrementNode(idOrArray, new IntLiteralNode(1, null), null);
         List<Node> commands = ctx.commands().command().stream().map(this::visit).toList();
-        return new LoopCommandNode(id, start, end, step, commands, Location.fromRuleContext(ctx));
+
+
+        return new ForCommandNode(
+            new AssignmentNode(idOrArray, visit, Location.fromRuleContext(ctx)),
+            test,
+            step,
+            commands,
+            Location.fromRuleContext(ctx));
     }
 
     @Override
+    public Node visitExpr(VisuAlgParser.ExprContext ctx) {
+        if (ctx.atom() instanceof VisuAlgParser.AtomContext atomContext) {
+            return visit(atomContext);
+        }
+        if (ctx.parenExpression() instanceof VisuAlgParser.ParenExpressionContext parenExpressionContext) {
+            return visit(parenExpressionContext.expr());
+        }
+        if (ctx.SUB() != null) {
+            return new NegNode(visit(ctx.expr(0)), Location.fromRuleContext(ctx));
+        }
+        if (ctx.NOT() != null) {
+            return new NotNode(visit(ctx.expr(0)), Location.fromRuleContext(ctx));
+        }
+        String text = ctx.getChild(1).getText();
+        return switch (text.toLowerCase()) {
+            case "+" -> new AddNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "-" -> new SubNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "*" -> new MulNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "/", "div", "\\" -> new DivNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "e" -> new AndNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "ou" -> new OrNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "nao", "não" -> new NotNode(visit(ctx.expr(0)), Location.fromRuleContext(ctx));
+            case "=" -> new EqNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "<" -> new LtNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case ">" -> new GtNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "<=" -> new LeNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case ">=" -> new GeNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "<>" -> new NeNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "%", "mod" -> new ModNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            case "pot" -> new PowNode(visit(ctx.expr(0)), visit(ctx.expr(1)), Location.fromRuleContext(ctx));
+            default -> throw new UnsupportedOperationException(text + " -> " + ctx.getParent().getText());
+        };
+    }
+
+    @Override
+    public Node visitAtom(VisuAlgParser.AtomContext ctx) {
+        if (ctx.idOrArray() != null) {
+            return new IdNode(ctx.idOrArray().getText(), Location.fromRuleContext(ctx));
+        }
+        if (ctx.literais() != null) {
+            return visit(ctx.literais());
+        }
+        if (ctx.subprogramCall() != null) {
+            return visit(ctx.subprogramCall());
+        }
+        throw new UnsupportedOperationException(ctx.getText());
+    }
+
+
+
+    @Override
     public Node visitEnquantoCommand(VisuAlgParser.EnquantoCommandContext ctx) {
-        Node expr = visit(ctx.expr());
+        Node test = visit(ctx.expr());
         List<Node> commands = ctx.commands().command().stream().map(this::visit).toList();
-        return new LoopCommandNode(null, null, null, null, commands, Location.fromRuleContext(ctx));
+        return new WhileCommandNode(test, commands, false, Location.fromRuleContext(ctx));
     }
 
     @Override
     public Node visitRepitaCommand(VisuAlgParser.RepitaCommandContext ctx) {
-        Node expr = visit(ctx.expr());
+        Node test = ctx.expr() instanceof VisuAlgParser.ExprContext v ? visit(v) : new BooleanLiteralNode(true, Location.fromRuleContext(ctx));
         List<Node> commands = ctx.commands().command().stream().map(this::visit).toList();
-        return new LoopCommandNode(null, null, null, null, commands, Location.fromRuleContext(ctx));
+        return new WhileCommandNode(test, commands, true, Location.fromRuleContext(ctx));
     }
 
 
     @Override
     public Node visitSubprogramCall(VisuAlgParser.SubprogramCallContext ctx) {
         String name = ctx.ID().getText();
-        List<Node> args = ctx.exprList().expr().stream().map(this::visit).toList();
+        VisuAlgParser.ExprListContext exprListContext = ctx.exprList();
+        if (exprListContext == null) {
+            return new SubprogramCallNode(name, List.of(), Location.fromRuleContext(ctx));
+        }
+        List<Node> args = exprListContext.expr().stream().map(this::visit).toList();
         return new SubprogramCallNode(name, args, Location.fromRuleContext(ctx));
     }
 

@@ -1,5 +1,7 @@
 package dev.thihup.jvisualg.frontend;
 
+import dev.thihup.jvisualg.frontend.impl.antlr.VisuAlgParser;
+import dev.thihup.jvisualg.frontend.node.Node;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -12,13 +14,17 @@ class MainTest {
     @ParameterizedTest
     @MethodSource("examplesV25")
     void testExamplesV25(Path path) throws Throwable {
-        Main.parse(path);
+        VisuAlgParser.AlgorithmContext parse = Main.parse(path);
+        Node node = Main.buildAST(parse);
+        System.out.println(Main.javaOutput(node));
     }
 
     @ParameterizedTest
     @MethodSource("examplesV30")
     void testExamplesV30(Path path) throws Throwable {
-        Main.parse(path);
+        VisuAlgParser.AlgorithmContext parse = Main.parse(path);
+        Node node = Main.buildAST(parse);
+        System.out.println(Main.javaOutput(node));
     }
 
     static Stream<Path> examplesV25() throws Throwable {

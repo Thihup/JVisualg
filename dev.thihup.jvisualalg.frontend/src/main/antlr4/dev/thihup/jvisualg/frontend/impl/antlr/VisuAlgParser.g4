@@ -52,7 +52,7 @@ formalParameterList : formalParameter (SEMICOLON formalParameter)*;
 formalParameter : (VAR)? ID (COMMA ID)* COLON type;
 
 // Expressions
-expr : LPAREN expr RPAREN
+expr : parenExpression
      | expr (OR | XOR | AND) expr
      | expr (EQ | NEQ | LT | LE | GT | GE) expr
      | expr (ADD | SUB | MUL | DIV | MOD | DIV_INT | POW ) expr
@@ -61,9 +61,11 @@ expr : LPAREN expr RPAREN
      | atom
      ;
 
+parenExpression: LPAREN expr RPAREN;
+
 atom : idOrArray
      | literais
-     | ID LPAREN exprList? RPAREN
+     | subprogramCall
      ;
 
 literais :  INT_LITERAL
