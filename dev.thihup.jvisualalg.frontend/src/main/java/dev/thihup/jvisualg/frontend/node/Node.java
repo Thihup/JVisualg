@@ -11,10 +11,10 @@ public sealed interface Node {
     record DeclarationsNode(List<Node> variableDeclarationContexts, List<Node> registroDeclarationContexts, List<Node> subprogramDeclarationContexts, List<Node> constantsDeclarationContexts, List<Node> dosContexts, Location location) implements Node {
     }
 
-    record FunctionDeclarationNode(String name, Node returnType, List<Node> parameters, List<Node> declarations,List<Node> commands, Location location) implements Node {
+    record FunctionDeclarationNode(String name, Node returnType, List<Node> parameters, List<Node> references, List<Node> declarations,List<Node> commands, Location location) implements Node {
     }
 
-    record ProcedureDeclarationNode(String name, List<Node> parameters, List<Node> declarations,List<Node> commands, Location location) implements Node {
+    record ProcedureDeclarationNode(String name, List<Node> parameters, List<Node> references, List<Node> declarations, List<Node> commands, Location location) implements Node {
     }
 
     record RegistroDeclarationNode(String name, List<Node> variableDeclarationContexts, Location location) implements Node {
@@ -73,7 +73,10 @@ public sealed interface Node {
     record IdNode(String id, Location location) implements Node {
     }
 
-    record ArrayAccessNode(IdNode node, List<Node> indexes, Location location) implements Node {
+    record ArrayAccessNode(Node node, List<Node> indexes, Location location) implements Node {
+    }
+
+    record MemberAccessNode(Node node, Node member, Location location) implements Node {
     }
 
     record ReadCommandNode(List<Node> exprList, Location location) implements Node {
@@ -88,6 +91,9 @@ public sealed interface Node {
     record ConditionalCommandNode(Node expr, List<Node> commands, List<Node> elseCommands, Location location) implements Node {
     }
 
+    record RangeNode(Node start, Node end, Location location) implements Node {
+    }
+
     record ChooseCommandNode(Node expr, List<Node> cases, Node defaultCase, Location location) implements Node {
     }
 
@@ -97,10 +103,13 @@ public sealed interface Node {
     record WhileCommandNode(Node test, List<Node> commands, boolean conditionAtEnd, Location location) implements Node {
     }
 
-    record ForCommandNode(Node start, Node test, Node step, List<Node> commands, Location location) implements Node {
+    record ForCommandNode(IdNode identifier, Node startValue, Node endValue, Node step, List<Node> commands, Location location) implements Node {
     }
 
-    record SubprogramCallNode(String name, List<Node> args, Location location) implements Node {
+    record ProcedureCallNode(String name, List<Node> args, Location location) implements Node {
+    }
+
+    record FunctionCallNode(String name, List<Node> args, Location location) implements Node {
     }
 
     sealed interface BinaryNode extends Node {

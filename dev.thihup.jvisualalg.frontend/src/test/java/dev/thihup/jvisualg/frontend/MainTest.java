@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 class MainTest {
@@ -16,7 +17,8 @@ class MainTest {
     void testExamplesV25(Path path) throws Throwable {
         VisuAlgParser.AlgorithmContext parse = Main.parse(path);
         Node node = Main.buildAST(parse);
-        System.out.println(Main.javaOutput(node));
+        List<String> strings = TypeChecker.semanticAnalysis(node);
+        strings.forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
 
     @ParameterizedTest
@@ -24,7 +26,8 @@ class MainTest {
     void testExamplesV30(Path path) throws Throwable {
         VisuAlgParser.AlgorithmContext parse = Main.parse(path);
         Node node = Main.buildAST(parse);
-        System.out.println(Main.javaOutput(node));
+        List<String> strings = TypeChecker.semanticAnalysis(node);
+        strings.forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
 
     static Stream<Path> examplesV25() throws Throwable {

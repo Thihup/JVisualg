@@ -20,4 +20,8 @@ public record Location(
         );
     }
 
+    public String toString() {
+        return startLine + ":" + startColumn;
+    }
+
 }

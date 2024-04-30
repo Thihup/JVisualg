@@ -9,7 +9,7 @@ algorithm : ALGORITMO STRING declarations INICIO commands FIM_ALGORITMO;
 declarations : (registroDeclaration | VAR (variableDeclaration SEMICOLON?)* | subprogramDeclaration  | constantsDeclaration | dos)*;
 registroDeclaration : TIPO ID EQ REGISTRO variableDeclaration* FIM_REGISTRO;
 variableDeclaration :  ID (COMMA ID)* COLON type ;
-constantsDeclaration: CONST (ID EQ literais SEMICOLON?)*;
+constantsDeclaration: CONST (ID EQ expr SEMICOLON?)*;
 type : INTEIRO | REAL | CARACTERE | LOGICO | VETOR LBRACK RANGE (COMMA RANGE)* RBRACK DE type | ID;
 
 // Commands
@@ -21,7 +21,7 @@ command : assignment
         | conditionalCommand
         | chooseCommand
         | loopCommand
-        | subprogramCall
+        | procedureCall
         | arquivoCommand
         | aleatorioCommand
         | timerCommand
@@ -40,7 +40,10 @@ return : RETORNE expr?;
 
 dos : DOS;
 
-idOrArray : ID ( (LBRACK expr (COMMA expr)* RBRACK) | (DOT ID) )*;
+memberAccess: (DOT idOrArray);
+arrayAccess: (LBRACK expr (COMMA expr)? RBRACK);
+id: ID;
+idOrArray : id (memberAccess  |  arrayAccess)*;
 
 assignment : idOrArray ASSIGN expr;
 
@@ -52,20 +55,21 @@ formalParameterList : formalParameter (SEMICOLON formalParameter)*;
 formalParameter : (VAR)? ID (COMMA ID)* COLON type;
 
 // Expressions
-expr : parenExpression
-     | expr (OR | XOR | AND) expr
-     | expr (EQ | NEQ | LT | LE | GT | GE) expr
-     | expr (ADD | SUB | MUL | DIV | MOD | DIV_INT | POW ) expr
-     | NOT expr
-     | SUB expr
-     | atom
-     ;
+ expr : parenExpression
+      | (NOT | SUB | ADD) expr
+      | expr (POW) expr
+      | expr (MUL | DIV | MOD | DIV_INT) expr
+      | expr (ADD | SUB) expr
+      | expr (EQ | NEQ | LT | LE | GT | GE) expr
+      | expr (AND | OR | XOR) expr
+      | atom
+      ;
 
 parenExpression: LPAREN expr RPAREN;
 
 atom : idOrArray
      | literais
-     | subprogramCall
+     | functionCall
      ;
 
 literais :  INT_LITERAL
@@ -82,19 +86,19 @@ readCommand : LEIA LPAREN exprList RPAREN;
 // Write command
 writeCommand : (ESCREVA | ESCREVAL) (LPAREN writeList? RPAREN)?;
 writeList : writeItem (COMMA writeItem)*;
-writeItem : (expr | STRING) (COLON INT_LITERAL (COLON INT_LITERAL)?)?;
+writeItem : expr (COLON INT_LITERAL (COLON INT_LITERAL)?)?;
 
 // Conditional commands
-conditionalCommand : SE expr* ENTAO commands FIMSE
-                   | SE expr* ENTAO commands SENAO commands FIMSE
+conditionalCommand : SE expr ENTAO commands FIMSE
+                   | SE expr ENTAO commands SENAO commands FIMSE
                    ;
 
-ateCase : INT_LITERAL ATE INT_LITERAL;
-ateCases: ateCase (COMMA ateCase)*;
+exprOrAte : expr (ATE expr)?;
+exprOrAteList : exprOrAte (COMMA exprOrAte)*;
 
-exprOrAte : (exprList | ateCases) (COMMA exprOrAte)*;
-
-chooseCommand: ESCOLHA expr* FACA? (CASO exprOrAte* commands)* (OUTROCASO commands)? FIMESCOLHA;
+chooseCase: CASO exprOrAteList commands;
+outroCase: OUTROCASO commands;
+chooseCommand: ESCOLHA expr FACA? chooseCase* outroCase? FIMESCOLHA;
 
 // Loop commands
 loopCommand : paraCommand | enquantoCommand | repitaCommand;
@@ -104,8 +108,11 @@ repitaCommand : REPITA commands ATE expr FIMREPITA?
                | REPITA commands FIMREPITA
                ;
 
-// Subprogram call
-subprogramCall : ID (LPAREN exprList? RPAREN)?;
+// Procedure call
+procedureCall : ID (LPAREN exprList? RPAREN)?;
+
+// Function call
+functionCall : ID (LPAREN exprList? RPAREN)?;
 
 // Arquivo command
 arquivoCommand : ARQUIVO STRING;

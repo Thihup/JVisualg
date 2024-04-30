@@ -7,7 +7,7 @@ FIM_ALGORITMO : 'fimalgoritmo';
 CONST : 'const';
 VAR : 'var';
 INTEIRO : 'inteiro';
-REAL : 'real';
+REAL : 'real' | 'numerico';
 CARACTERE : 'caracter' | 'caractere';
 LOGICO : 'logico';
 VETOR : 'vetor';
