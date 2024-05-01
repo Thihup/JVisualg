@@ -1,4 +1,4 @@
-package dev.thihup.jvisualg.frontend;
+package dev.thihup.jvisualg.backend.java;
 
 import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
@@ -82,14 +82,14 @@ public class JavaBackend {
             case Node.IncrementNode(Node expr, Node value, _) ->
                     "%s += %s".formatted(javaOutput(expr), javaOutput(value));
 
-//            case ForCommandNode(Node start, Node test, Node end, List<Node> commands, _) -> {
-//                String s = start != null ? "int " + javaOutput(start) : ";";
-//                yield """
-//                    for (%s %s; %s) {
-//                        %s
-//                    }
-//                    """.formatted(s, javaOutput(test), javaOutput(end), commands.stream().map(Main::javaOutput).collect(Collectors.joining("\n\t")));
-//            }
+
+            case Node.ForCommandNode(Node.IdNode identifier, Node startValue, Node endValue, Node step, List<Node> commands, _) -> {
+                yield """
+                        for (%s = %s; %s <= %s; %s += %s) {
+                            %s
+                        }
+                        """.formatted(javaOutput(identifier), javaOutput(startValue), javaOutput(identifier), javaOutput(endValue), javaOutput(identifier), javaOutput(step), commands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining()));
+            }
 
             case Node.WhileCommandNode(Node condition, List<Node> commands, boolean atTheEnd, _) -> {
                 if (atTheEnd) {
