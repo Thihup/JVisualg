@@ -83,29 +83,32 @@ public class VisualgLanguageServer implements LanguageServer, LanguageClientAwar
 
     private void checkForErrors(TextDocumentItem params) {
         try {
-            client.logMessage(new MessageParams(MessageType.Info, "Checking for errors"));
             String text = params.getText();
 
             byte[] bytes = text.getBytes(StandardCharsets.ISO_8859_1);
             Main.Result astResult = Main.buildAST(new ByteArrayInputStream(bytes));
 
             List<Error> errors = astResult.errors();
-            if (errors.isEmpty()) {
-                Main.Result typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
-                errors = typecheckResult.errors();
-            }
 
-            client.publishDiagnostics(new PublishDiagnosticsParams(params.getUri(), errors.stream().map(s -> {
-                Diagnostic diagnostic = new Diagnostic();
-                diagnostic.setMessage(s.message());
-                diagnostic.setSeverity(DiagnosticSeverity.Error);
-                Location location = s.location();
-                Position startPosition = new Position(location.startLine() - 1, location.startColumn());
-                Position endPosition = new Position(location.endLine() - 1, location.endColumn());
-                diagnostic.setRange(new Range(startPosition, endPosition));
-                return diagnostic;
+            astResult.node()
+                .map(TypeChecker::semanticAnalysis)
+                .map(Main.Result::errors)
+                .ifPresent(errors::addAll);
 
-            }).toList()));
+            List<Diagnostic> list = errors.stream()
+                .map(s -> {
+                    Diagnostic diagnostic = new Diagnostic();
+                    diagnostic.setMessage(s.message());
+                    diagnostic.setSeverity(DiagnosticSeverity.Error);
+                    Location location = s.location();
+                    Position startPosition = new Position(location.startLine() - 1, location.startColumn());
+                    Position endPosition = new Position(location.endLine() - 1, location.endColumn());
+                    diagnostic.setRange(new Range(startPosition, endPosition));
+                    return diagnostic;
+                }).toList();
+
+            PublishDiagnosticsParams diagnostics = new PublishDiagnosticsParams(params.getUri(), list);
+            client.publishDiagnostics(diagnostics);
         } catch (Throwable e) {
             client.logMessage(new MessageParams(MessageType.Error, e.getMessage()));
         }
