@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
+class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
 
     @Override
@@ -204,11 +204,11 @@ public class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
             .stream()
             .map(this::visit)
             .reduce((result, element) -> switch (element) {
-                case ArrayAccessNode(_, List<Node> indexes, Location location) ->
-                        new ArrayAccessNode(result, indexes, location);
-                case MemberAccessNode(_, Node expr, Location location) ->
-                        new MemberAccessNode(result, expr, location);
-                case IdNode id -> id;
+                case ArrayAccessNode(_, List<Node> indexes, _) ->
+                        new ArrayAccessNode(result, indexes, Location.fromRuleContext(ctx));
+                case MemberAccessNode(_, Node expr, Location _) ->
+                        new MemberAccessNode(result, expr, Location.fromRuleContext(ctx));
+                case IdNode id -> new IdNode(id.id(), Location.fromRuleContext(ctx));
                 default -> throw new IllegalStateException();
             })
         .orElseThrow();

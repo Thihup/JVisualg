@@ -12,7 +12,7 @@ import static dev.thihup.jvisualg.frontend.TypeChecker.Type.PrimitiveTypes.*;
 
 public class TypeChecker {
 
-    private static final Scope DEFAULT_GLOBAL_SCOPE = new Scope("DEFAULT", Map.of(), Map.of(),
+    public static final Scope DEFAULT_GLOBAL_SCOPE = new Scope("DEFAULT", Map.of(), Map.of(),
         Map.ofEntries(
             Map.entry("abs", new Declaration.Function("abs", Type.PrimitiveTypes.REAL, Map.of("valor", new Declaration.Variable("valor", Type.PrimitiveTypes.REAL)))),
             Map.entry("arccos", new Declaration.Function("arccos", Type.PrimitiveTypes.REAL, Map.of("valor", new Declaration.Variable("valor", Type.PrimitiveTypes.REAL)))),
@@ -57,7 +57,7 @@ public class TypeChecker {
         ),
         Map.of("mudacor", new Declaration.Procedure("mudacor", Map.of("letra", new Declaration.Variable("letra", CARACTERE), "fundo", new Declaration.Variable("fundo", CARACTERE)))), Map.of(), null);
 
-    sealed interface Type {
+    public sealed interface Type {
         enum PrimitiveTypes implements Type {
             CARACTERE, INTEIRO, REAL, LOGICO, UNDECLARED, UNDEFINED
         }
@@ -66,7 +66,7 @@ public class TypeChecker {
         }
     }
 
-    sealed interface Declaration {
+    public sealed interface Declaration {
         String name();
 
         record Variable(String name, Type type) implements Declaration {
@@ -92,7 +92,7 @@ public class TypeChecker {
         }
     }
 
-    record Scope(String name, Map<String, Declaration.Variable> variables, Map<String, Declaration.Constant> constants, Map<String, Declaration.Function> functions, Map<String, Declaration.Procedure> procedures, Map<String, Declaration.UserDefinedType> userDefinedTypes, Scope parent) {
+    public record Scope(String name, Map<String, Declaration.Variable> variables, Map<String, Declaration.Constant> constants, Map<String, Declaration.Function> functions, Map<String, Declaration.Procedure> procedures, Map<String, Declaration.UserDefinedType> userDefinedTypes, Scope parent) {
 
         static Scope newScope(String scopeName, Scope parent) {
             return new Scope(scopeName, new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), parent);
@@ -129,16 +129,16 @@ public class TypeChecker {
         }
     }
 
-    public static List<String> semanticAnalysis(Node node) {
-        List<String> errors = new ArrayList<>();
+    public static Main.Result semanticAnalysis(Node node) {
+        List<Error> errors = new ArrayList<>();
 
         Scope scope = Scope.newScope("GLOBAL", DEFAULT_GLOBAL_SCOPE);
 
         semanticAnalysis(node, scope, errors);
-        return errors;
+        return new Main.Result(Optional.of(node), errors);
     }
 
-    private static void semanticAnalysis(Node node, Scope scope, List<String> errors) {
+    private static void semanticAnalysis(Node node, Scope scope, List<Error> errors) {
         switch (node) {
             case Node.AlgoritimoNode algoritimoNode -> {
                 semanticAnalysis(algoritimoNode.declarations(), scope, errors);
@@ -148,7 +148,7 @@ public class TypeChecker {
 
             case Node.FunctionDeclarationNode functionDeclarationNode -> {
                 if (scope.function(functionDeclarationNode.name()).isPresent()) {
-                    errors.add("Function " + functionDeclarationNode.name() + " already declared");
+                    errors.add(new Error("Function " + functionDeclarationNode.name() + " already declared", functionDeclarationNode.location()));
                 } else {
                     Type returnType = getType(functionDeclarationNode.returnType(), scope, errors);
                     Map<String, Declaration.Variable> parameters = functionDeclarationNode.parameters().stream()
@@ -167,7 +167,7 @@ public class TypeChecker {
             }
             case Node.ProcedureDeclarationNode procedureDeclarationNode -> {
                 if (scope.procedure(procedureDeclarationNode.name()).isPresent()) {
-                    errors.add("Procedure " + procedureDeclarationNode.name() + " already declared");
+                    errors.add(new Error("Procedure " + procedureDeclarationNode.name() + " already declared", procedureDeclarationNode.location()));
                 } else {
                     Map<String, Declaration.Variable> parameters = procedureDeclarationNode.parameters().stream()
                             .filter(x -> x instanceof Node.VariableDeclarationNode)
@@ -185,7 +185,7 @@ public class TypeChecker {
             }
             case Node.RegistroDeclarationNode registroDeclarationNode -> {
                 if (scope.variable(registroDeclarationNode.name()).isPresent()) {
-                    errors.add("Registro " + registroDeclarationNode.name() + " already declared");
+                    errors.add(new Error("Registro " + registroDeclarationNode.name() + " already declared", registroDeclarationNode.location()));
                 } else {
                     Scope registroScope = Scope.newScope(registroDeclarationNode.name(), scope);
                     registroDeclarationNode.variableDeclarationContexts().forEach(variableDeclarationContext -> semanticAnalysis(variableDeclarationContext, registroScope, errors));
@@ -200,7 +200,7 @@ public class TypeChecker {
             }
             case Node.ConstantNode constantNode -> {
                 if (scope.constant(constantNode.name()).isPresent()) {
-                    errors.add("Constant " + constantNode.name() + " already declared");
+                    errors.add(new Error("Constant " + constantNode.name() + " already declared", constantNode.location()));
                 } else scope.constants().put(constantNode.name().toLowerCase(), new Declaration.Constant(constantNode.name(), getType(constantNode, scope, errors)));
             }
             case Node.CommandsNode commandsNode -> {
@@ -210,29 +210,29 @@ public class TypeChecker {
 
             case Node.CompundNode(var nodes, _) ->  nodes.forEach(n -> semanticAnalysis(n, scope, errors));
 
-            default -> errors.add("Unsupported node: " + node.getClass());
+            default -> errors.add(new Error("Unsupported node: " + node.getClass(), node.location()));
         };
     }
 
-    private static void typeCheckCommand(Node command, Scope scope, List<String> errors) {
+    private static void typeCheckCommand(Node command, Scope scope, List<Error> errors) {
         switch (command) {
             case Node.InterrompaCommandNode interrompaCommandNode -> {
                 if (scope.parent() == null) {
-                    errors.add("Interrompa command outside of a function or procedure");
+                    errors.add(new Error("Interrompa command outside of a function or procedure", interrompaCommandNode.location()));
                 }
             }
             case Node.ReturnNode(var node, var location) -> {
                 if (scope.parent() == null) {
-                    errors.add("Return command outside of a function");
+                    errors.add(new Error("Return command outside of a function", location));
                 }
                 Type type = getType(node, scope, errors);
                 Optional<Declaration.Function> function = scope.function(scope.name);
                 if (function.isEmpty()) {
-                    errors.add("Should have a function");
+                    errors.add(new Error("Should have a function", location));
 
                 } else {
                     if (!areTypesCompatible(type, function.get().returnType())) {
-                        errors.add("Return type different from function type: " + function.get().returnType() + " and " + type);
+                        errors.add(new Error("Return type different from function type: " + function.get().returnType() + " and " + type, location));
                     }
                 }
 
@@ -240,14 +240,14 @@ public class TypeChecker {
 
             case Node.DosNode dosNode -> {
                 if (scope.parent() != null) {
-                    errors.add("Dos command inside a function or procedure");
+                    errors.add(new Error("Dos command inside a function or procedure", dosNode.location()));
                 }
             }
 
             case Node.IncrementNode incrementNode -> {
                 Type type = getType(incrementNode.expr(), scope, errors);
                 if (type instanceof Type.PrimitiveTypes) {
-                    errors.add("Increment command on a primitive type: " + type);
+                    errors.add(new Error("Increment command on a primitive type: " + type, incrementNode.location()));
                 }
             }
 
@@ -257,30 +257,30 @@ public class TypeChecker {
 
                 if (idType instanceof Type.Array arrayType) {
                     if (!arrayType.type().equals(exprType)) {
-                        errors.add("Assignment of different types: " + arrayType.type() + " and " + exprType);
+                        errors.add(new Error("Assignment of different types: " + arrayType.type() + " and " + exprType, assignmentNode.location()));
                     }
                 } else if (!areTypesCompatible(idType, exprType)) {
-                     errors.add(assignmentNode.location() + ": Assignment of different types: " + idType + " and " + exprType);
+                    errors.add(new Error(assignmentNode.location() + ": Assignment of different types: " + idType + " and " + exprType, assignmentNode.location()));
                 }
             }
 
             case Node.ForCommandNode forCommandNode -> {
                 Node.IdNode identifier = forCommandNode.identifier();
                 if (scope.variable(identifier.id()).isEmpty()) {
-                    errors.add("For command with undeclared variable: " + identifier.id());
+                    errors.add(new Error("For command with undeclared variable: " + identifier.id(), identifier.location()));
                 }
 
                 Type startType = getType(forCommandNode.startValue(), scope, errors);
                 Type endType = getType(forCommandNode.endValue(), scope, errors);
                 Type stepType = getType(forCommandNode.step(), scope, errors);
                 if (startType != Type.PrimitiveTypes.INTEIRO) {
-                    errors.add("For start command with non-integer types: " + startType);
+                    errors.add(new Error("For start command with non-integer types: " + startType, forCommandNode.location()));
                 }
                 if (endType != Type.PrimitiveTypes.INTEIRO && endType != Type.PrimitiveTypes.UNDEFINED) {
-                    errors.add("For end command with non-integer types: " + endType);
+                    errors.add(new Error("For end command with non-integer types: " + endType, forCommandNode.location()));
                 }
                 if (stepType != Type.PrimitiveTypes.INTEIRO && stepType != Type.PrimitiveTypes.UNDECLARED) {
-                    errors.add("For step command with non-integer types: " + stepType);
+                    errors.add(new Error("For step command with non-integer types: " + stepType, forCommandNode.location()));
                 }
                 forCommandNode.commands().forEach(x -> typeCheckCommand(x, scope, errors));
             }
@@ -288,7 +288,7 @@ public class TypeChecker {
             case Node.WhileCommandNode whileCommandNode -> {
                 Type testType = getType(whileCommandNode.test(), scope, errors);
                 if (testType != Type.PrimitiveTypes.LOGICO) {
-                    errors.add("While command with non-boolean type: " + testType);
+                    errors.add(new Error("While command with non-boolean type: " + testType, whileCommandNode.location()));
                 }
                 whileCommandNode.commands().forEach(x -> typeCheckCommand(x, scope, errors));
             }
@@ -296,19 +296,19 @@ public class TypeChecker {
             case Node.ArrayAccessNode arrayAccessNode -> {
                 Type idType = getType(arrayAccessNode.node(), scope, errors);
                 if (!(idType instanceof Type.Array)) {
-                    errors.add("Array access on a non-array type:" + idType);
+                    errors.add(new Error("Array access on a non-array type:" + idType, arrayAccessNode.location()));
                 }
                 for (Node index : arrayAccessNode.indexes()) {
                     Type indexType = getType(index, scope, errors);
                     if (indexType != Type.PrimitiveTypes.INTEIRO) {
-                        errors.add("Array access with non-integer index: " + indexType);
+                        errors.add(new Error("Array access with non-integer index: " + indexType, arrayAccessNode.location()));
                     }
                 }
             }
 
             case Node.IdNode idNode -> {
                 if (scope.declaration(idNode.id()).isEmpty()) {
-                    errors.add(idNode.id() + " not declared");
+                    errors.add(new Error(idNode.id() + " not declared", idNode.location()));
                 }
             }
 
@@ -316,7 +316,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (leftType != Type.PrimitiveTypes.INTEIRO || rightType != Type.PrimitiveTypes.INTEIRO) {
-                    errors.add("Div command with non-integer types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Div command with non-integer types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -324,7 +324,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (leftType != Type.PrimitiveTypes.INTEIRO || rightType != Type.PrimitiveTypes.INTEIRO) {
-                    errors.add("Mod command with non-integer types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Mod command with non-integer types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -332,9 +332,9 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (leftType != rightType) {
-                    errors.add("Add command with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Add command with different types: " + leftType + " and " + rightType, location));
                 } else if (leftType != Type.PrimitiveTypes.INTEIRO && leftType != Type.PrimitiveTypes.REAL && leftType != CARACTERE) {
-                    errors.add("Add command with non-integer, real or character types: " + leftType);
+                    errors.add(new Error("Add command with non-integer, real or character types: " + leftType, location));
                 }
 
             }
@@ -343,7 +343,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areNumbers(leftType, rightType)) {
-                    errors.add("Sub command with non-number types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Sub command with non-number types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -351,7 +351,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areNumbers(leftType, rightType)) {
-                    errors.add("Mul command with non-number types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Mul command with non-number types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -359,7 +359,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areNumbers(leftType, rightType)) {
-                    errors.add("Pow command with non-number types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Pow command with non-number types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -367,7 +367,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areThey(LOGICO, leftType, rightType)) {
-                    errors.add("And command with non-boolean types: " + leftType + " and " + rightType);
+                    errors.add(new Error("And command with non-boolean types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -375,14 +375,14 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areThey(LOGICO, leftType, rightType)) {
-                    errors.add("Or command with non-boolean types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Or command with non-boolean types: " + leftType + " and " + rightType, location));
                 }
             }
 
             case Node.NotNode(Node expr, Location location) -> {
                 Type exprType = getType(expr, scope, errors);
                 if (exprType != Type.PrimitiveTypes.LOGICO) {
-                    errors.add("Not command with non-boolean type: " + exprType);
+                    errors.add(new Error("Not command with non-boolean type: " + exprType, location));
                 }
             }
 
@@ -390,7 +390,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areTypesCompatible(leftType, rightType)) {
-                    errors.add("Eq command with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Eq command with different types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -398,7 +398,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areTypesCompatible(leftType, rightType)) {
-                    errors.add("Ne command with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Ne command with different types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -406,7 +406,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areTypesCompatible(leftType, rightType)) {
-                    errors.add("Lt command with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Lt command with different types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -414,7 +414,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areTypesCompatible(leftType, rightType)) {
-                    errors.add("Le command with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Le command with different types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -422,7 +422,7 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areTypesCompatible(leftType, rightType)) {
-                    errors.add("Gt command with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Gt command with different types: " + leftType + " and " + rightType, location));
                 }
             }
 
@@ -430,21 +430,21 @@ public class TypeChecker {
                 Type leftType = getType(left, scope, errors);
                 Type rightType = getType(right, scope, errors);
                 if (!areTypesCompatible(leftType, rightType)) {
-                    errors.add("Ge command with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Ge command with different types: " + leftType + " and " + rightType, location));
                 }
             }
 
             case Node.NegNode(Node expr, Location location) -> {
                 Type exprType = getType(expr, scope, errors);
                 if (!areNumbers(exprType, Type.PrimitiveTypes.REAL)) {
-                    errors.add("Neg command with non number type: " + exprType);
+                    errors.add(new Error("Neg command with non number type: " + exprType, location));
                 }
             }
 
             case Node.ConditionalCommandNode ifNode -> {
                 Type conditionType = getType(ifNode.expr(), scope, errors);
                 if (conditionType != Type.PrimitiveTypes.LOGICO) {
-                    errors.add("If command with non-boolean condition:" + conditionType);
+                    errors.add(new Error("If command with non-boolean condition:" + conditionType, ifNode.location()));
                 }
                 ifNode.commands().forEach(c -> typeCheckCommand(c, scope, errors));
                 ifNode.elseCommands().forEach(c -> typeCheckCommand(c, scope, errors));
@@ -452,24 +452,24 @@ public class TypeChecker {
 
             case Node.ProcedureCallNode procedureCallNode -> {
                 if (scope.procedure(procedureCallNode.name()).isEmpty()) {
-                    errors.add("Procedure " + procedureCallNode.name() + " not declared");
+                    errors.add(new Error("Procedure " + procedureCallNode.name() + " not declared", procedureCallNode.location()));
                 }
                 for (Node arg : procedureCallNode.args()) {
                     Type argType = getType(arg, scope, errors);
                     if (argType == Type.PrimitiveTypes.UNDECLARED) {
-                        errors.add("Procedure call with undeclared type");
+                        errors.add(new Error("Procedure call with undeclared type", procedureCallNode.location()));
                     }
                 }
             }
 
             case Node.FunctionCallNode functionCallNode -> {
                 if (scope.function(functionCallNode.name()).isEmpty()) {
-                    errors.add("Function " + functionCallNode.name() + " not declared");
+                    errors.add(new Error("Function " + functionCallNode.name() + " not declared", functionCallNode.location()));
                 }
                 for (Node arg : functionCallNode.args()) {
                     Type argType = getType(arg, scope, errors);
                     if (argType == Type.PrimitiveTypes.UNDECLARED) {
-                        errors.add("Function call with undeclared type");
+                        errors.add(new Error("Function call with undeclared type", functionCallNode.location()));
                     }
                 }
             }
@@ -477,21 +477,21 @@ public class TypeChecker {
             case Node.AleatorioCommandNode aleatorioCommandNode -> {
                 for (Integer arg : aleatorioCommandNode.args()) {
                     if (arg < 0) {
-                        errors.add("Aleatorio command with negative argument: " + arg);
+                        errors.add(new Error("Aleatorio command with negative argument: " + arg, aleatorioCommandNode.location()));
                     }
                 }
             }
 
             case Node.TimerCommandNode timerCommandNode -> {
                 if (timerCommandNode.value() < 0) {
-                    errors.add("Timer command with negative argument: " + timerCommandNode.value());
+                    errors.add(new Error("Timer command with negative argument: " + timerCommandNode.value(), timerCommandNode.location()));
                 }
             }
 
             case Node.ChooseCommandNode commandNode -> {
                 Type type = getType(commandNode.expr(), scope, errors);
                 if (type != Type.PrimitiveTypes.INTEIRO && type != CARACTERE) {
-                    errors.add("Choose command with non-integer type: " + type);
+                    errors.add(new Error("Choose command with non-integer type: " + type, commandNode.location()));
                 }
                 commandNode.cases().forEach(c -> typeCheckCommand(c, scope, errors));
             }
@@ -499,7 +499,7 @@ public class TypeChecker {
             case Node.ChooseCaseNode caseNode -> {
                 Type type = getType(caseNode.value(), scope, errors);
                 if (!areNumbers(type, REAL) && type != CARACTERE) {
-                    errors.add("Choose case with non number neither caracter type: " + type);
+                    errors.add(new Error("Choose case with non number neither caracter type: " + type, caseNode.location()));
                 }
                 caseNode.commands().forEach(c -> typeCheckCommand(c, scope, errors));
             }
@@ -508,9 +508,9 @@ public class TypeChecker {
                 for (Node id : readCommandNode.exprList()) {
                     Type idType = getType(id, scope, errors);
                     if (idType == Type.PrimitiveTypes.UNDECLARED) {
-                        errors.add("Read command on undeclared type");
+                        errors.add(new Error("Read command on undeclared type", readCommandNode.location()));
                     } else if (idType instanceof Type.Array) {
-                        errors.add("Read command on array type: " + idType);
+                        errors.add(new Error("Read command on array type: " + idType, readCommandNode.location()));
                     }
                 }
             }
@@ -518,20 +518,20 @@ public class TypeChecker {
             case Node.WriteItemNode writeItemNode -> {
                 Type type = getType(writeItemNode.expr(), scope, errors);
                 if (type == Type.PrimitiveTypes.UNDECLARED) {
-                    errors.add("Write command on undeclared type");
+                    errors.add(new Error("Write command on undeclared type", writeItemNode.location()));
                 }
                 if (writeItemNode.precision() != null && type != Type.PrimitiveTypes.REAL) {
-                    errors.add("Write command with precision on non-real type: " + type);
+                    errors.add(new Error("Write command with precision on non-real type: " + type, writeItemNode.location()));
                 }
             }
             case Node.WriteCommandNode writeCommandNode -> writeCommandNode.writeList().forEach(x -> semanticAnalysis(x, scope, errors));
             case Node.LimpatelaCommandNode _, Node.EcoCommandNode _, Node.DebugCommandNode _, Node.PausaCommandNode _, Node.CronometroCommandNode _ -> {}
             case Node.CommandNode commandNode -> typeCheckCommand(commandNode.command(), scope, errors);
-            default -> errors.add("Unsupported command node: " + command.getClass());
+            default -> errors.add(new Error("Unsupported command node: " + command.getClass(), command.location()));
         }
     }
 
-    private static Type getType(Node node, Scope scope, List<String> errors) {
+    private static Type getType(Node node, Scope scope, List<Error> errors) {
         return switch (node) {
             case null -> Type.PrimitiveTypes.UNDEFINED;
             case Node.TypeNode typeNode ->
@@ -545,7 +545,7 @@ public class TypeChecker {
                         if (type.isPresent()) {
                             yield type.get();
                         } else {
-                            errors.add("Type " + typeNode.type() + " not declared");
+                            errors.add(new Error("Type " + typeNode.type() + " not declared", typeNode.location()));
                             yield Type.PrimitiveTypes.UNDECLARED;
                         }
                     }
@@ -564,17 +564,17 @@ public class TypeChecker {
                 if (idType instanceof Declaration.UserDefinedType userDefinedType) {
                     Node member = memberAccessNode.member();
                     if (!(member instanceof Node.IdNode idNode)) {
-                        errors.add("Member access with non-id node: " + member);
+                        errors.add(new Error("Member access with non-id node: " + member, member.location()));
                         yield Type.PrimitiveTypes.UNDECLARED;
                     }
                     Declaration.Variable variable = userDefinedType.variables().get(idNode.id().toLowerCase());
                     if (variable == null) {
-                        errors.add("Member " + member + " not declared in type " + userDefinedType.name());
+                        errors.add(new Error("Member " + member + " not declared in type " + userDefinedType.name(), member.location()));
                         yield Type.PrimitiveTypes.UNDECLARED;
                     }
                     yield variable.type();
                 } else {
-                    errors.add("Member access on a non-user defined type: " + idType);
+                    errors.add(new Error("Member access on a non-user defined type: " + idType, memberAccessNode.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -596,7 +596,7 @@ public class TypeChecker {
             case Node.IdNode idNode -> {
                 Optional<? extends Declaration> declaration = scope.declaration(idNode.id());
                 if (declaration.isEmpty()) {
-                    errors.add(idNode.id() + " not declared");
+                    errors.add(new Error(idNode.id() + " not declared", idNode.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
                 yield getType(declaration.get(), scope, errors);
@@ -609,21 +609,21 @@ public class TypeChecker {
                 if (exprType == Type.PrimitiveTypes.LOGICO) {
                     yield Type.PrimitiveTypes.LOGICO;
                 } else {
-                    errors.add("Not operation with non-boolean type: " + exprType);
+                    errors.add(new Error("Not operation with non-boolean type: " + exprType, notNode.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
 
             case Node.ProcedureCallNode procedureCallNode -> {
                 if (scope.procedure(procedureCallNode.name()).isPresent()) {
-                    errors.add("Procedure " + procedureCallNode.name() + " does not return a value");
+                    errors.add(new Error("Procedure " + procedureCallNode.name() + " does not return a value", procedureCallNode.location()));
                 }
                 yield Type.PrimitiveTypes.UNDECLARED;
             }
             case Node.FunctionCallNode functionCallNode -> {
                 Optional<Declaration.Function> function = scope.function(functionCallNode.name());
                 if (function.isEmpty()) {
-                    errors.add("Function " + functionCallNode.name() + " not declared");
+                    errors.add(new Error("Function " + functionCallNode.name() + " not declared", functionCallNode.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
                 yield function.get().returnType();
@@ -648,20 +648,20 @@ public class TypeChecker {
                         yield getGeneralNumberType(startType, endType);
                     }
                 } else {
-                    errors.add("Binary operation with non-primitive types: " + startType + " and " + endType);
+                    errors.add(new Error("Binary operation with non-primitive types: " + startType + " and " + endType, start.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
 
             default -> {
-                errors.add("Unsupported type node: " + node.getClass());
+                errors.add(new Error("Unsupported type node: " + node.getClass(), node.location()));
                 yield Type.PrimitiveTypes.UNDECLARED;
             }
 
         };
     }
 
-    private static Type getType(Declaration declaration, Scope scope, List<String> errors) {
+    private static Type getType(Declaration declaration, Scope scope, List<Error> errors) {
         return switch (declaration) {
             case Declaration.Variable variable -> variable.type();
             case Declaration.Constant constant -> constant.type();
@@ -671,7 +671,7 @@ public class TypeChecker {
         };
     }
 
-    private static Type getType(Node.BinaryNode node, Scope scope, List<String> errors) {
+    private static Type getType(Node.BinaryNode node, Scope scope, List<Error> errors) {
         return switch (node) {
             case Node.AddNode _ -> {
                 Type leftType = getType(node.left(), scope, errors);
@@ -681,7 +681,7 @@ public class TypeChecker {
                 } else if (areNumbers(leftType, rightType)) {
                     yield getGeneralNumberType(leftType, rightType);
                 }else {
-                    errors.add("Binary operation with non-primitive types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Binary operation with non-primitive types: " + leftType + " and " + rightType, node.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -692,7 +692,7 @@ public class TypeChecker {
                 if (areNumbers(leftType, rightType)) {
                     yield getGeneralNumberType(leftType, rightType);
                 } else {
-                    errors.add("Binary operation with non-primitive types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Binary operation with non-primitive types: " + leftType + " and " + rightType, node.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -702,7 +702,7 @@ public class TypeChecker {
                 if (areThey(Type.PrimitiveTypes.LOGICO, leftType, rightType)) {
                     yield Type.PrimitiveTypes.LOGICO;
                 } else {
-                    errors.add("Binary operation with non-boolean types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Binary operation with non-boolean types: " + leftType + " and " + rightType, node.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -712,7 +712,7 @@ public class TypeChecker {
                 if (areTypesCompatible(leftType, rightType)) {
                     yield Type.PrimitiveTypes.LOGICO;
                 } else {
-                    errors.add("Binary operation with different types: " + leftType + " and " + rightType);
+                    errors.add(new Error("Binary operation with different types: " + leftType + " and " + rightType, node.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }

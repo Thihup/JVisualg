@@ -15,19 +15,17 @@ class MainTest {
     @ParameterizedTest
     @MethodSource("examplesV25")
     void testExamplesV25(Path path) throws Throwable {
-        VisuAlgParser.AlgorithmContext parse = Main.parse(path);
-        Node node = Main.buildAST(parse);
-        List<String> strings = TypeChecker.semanticAnalysis(node);
-        strings.forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
+        Main.Result astResult = Main.buildAST(Files.newInputStream(path));
+        Main.Result typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
+        typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
 
     @ParameterizedTest
     @MethodSource("examplesV30")
     void testExamplesV30(Path path) throws Throwable {
-        VisuAlgParser.AlgorithmContext parse = Main.parse(path);
-        Node node = Main.buildAST(parse);
-        List<String> strings = TypeChecker.semanticAnalysis(node);
-        strings.forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
+        Main.Result astResult = Main.buildAST(Files.newInputStream(path));
+        Main.Result typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
+        typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
 
     static Stream<Path> examplesV25() throws Throwable {
