@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "VisualG",
+  "fileTypes": ["alg"],
+  "patterns": [
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#comment"
+    },
+    {
+      "name": "constant.numeric.visualg",
+      "match": "\\b[[:digit:]]+(\\.[[:digit:]]*)?"
+    }
+  ],
+  "repository": {
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.visualg",
+          "match": "<\\-"
+        },
+        {
+          "name": "keyword.control.visualg",
+          "match": ":="
+        },
+        {
+            "name": "keyword.control.visualg",
+            "match": "(?i)\\b(Div|Mod|Algoritmo|FimAlgoritmo|Funcao|Função|FimFuncao|FimFunção|Procedimento|FimProcedimento|Se|Entao|Então|Senao|Senão|FimSe|Para|De|Ate|Até|Passo|FimPara|Faca|Faça|Enquanto|FimEnquanto|Escreva|Escreval|Leia|Retorne|Vetor|E|Ou|Nao|Não|Verdadeiro|Falso|Inicio|Escolha|FimEscolha|Repita|FimRepita|Caso|OutroCaso|Var|Inteiro|Real|Logico|Caracter|Caractere|Literal)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.visualg",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.visualg",
+          "match": "\\\\(x[A-Fa-f0-9][A-Fa-f0-9]?|.)"
+        }
+      ]
+    },
+    "comment": {
+      "name": "comment.line.visualg",
+      "begin": "//",
+      "end": "$"
+    }
+  },
+  "scopeName": "source.visualg"
+}
