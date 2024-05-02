@@ -55,7 +55,7 @@ public class TypeChecker {
             Map.entry("randi", new Declaration.Function("randi", Type.PrimitiveTypes.INTEIRO, Map.of("limite", new Declaration.Variable("limite", Type.PrimitiveTypes.INTEIRO))))
 
         ),
-        Map.of("mudacor", new Declaration.Procedure("mudacor", Map.of("letra", new Declaration.Variable("letra", CARACTERE), "fundo", new Declaration.Variable("fundo", CARACTERE)))), Map.of(), null);
+        Map.of("mudacor", new Declaration.Procedure("mudacor", Map.of("cor", new Declaration.Variable("cor", CARACTERE), "localizacao", new Declaration.Variable("localizacao", CARACTERE)))), Map.of(), null);
 
     public sealed interface Type {
         enum PrimitiveTypes implements Type {
@@ -118,14 +118,16 @@ public class TypeChecker {
             return Optional.ofNullable(constants.get(name.toLowerCase())).or(() -> parent == null ? Optional.empty() : parent.constant(name));
         }
 
-        public <T extends Declaration> Optional<T> declaration(String name) {
-            return Stream.<Function<String, Optional<T>>>of(
-                (n) -> (Optional<T>) function(n),
-                (n) -> (Optional<T>) procedure(n),
-                (n) -> (Optional<T>) variable(n),
-                (n) -> (Optional<T>) constant(n),
-                (n) -> (Optional<T>) type(n)
-            ).map(optionalSupplier -> optionalSupplier.apply(name.toLowerCase())).flatMap(Optional::stream).findFirst();
+        public Optional<? extends Declaration> declaration(String name) {
+            return Stream.<Function<String, Optional<? extends Declaration>>>of(
+                this::function,
+                this::procedure,
+                this::variable,
+                this::constant,
+                this::type
+            ).map(optionalSupplier -> optionalSupplier.apply(name.toLowerCase()))
+            .flatMap(Optional::stream)
+            .findFirst();
         }
     }
 
@@ -192,26 +194,21 @@ public class TypeChecker {
                     scope.userDefinedTypes.put(registroDeclarationNode.name().toLowerCase(), new Declaration.UserDefinedType(registroDeclarationNode.name(), registroScope.variables()));
                 }
             }
-            case Node.VariableDeclarationNode variableDeclarationNode -> {
-                scope.variables().put(variableDeclarationNode.name().toLowerCase(), new Declaration.Variable(variableDeclarationNode.name(), getType(variableDeclarationNode.type(), scope, errors)));
-            }
-            case Node.ConstantsDeclarationNode constantsDeclarationNode -> {
-                constantsDeclarationNode.constants().forEach(constant -> semanticAnalysis(constant, scope, errors));
-            }
+            case Node.VariableDeclarationNode variableDeclarationNode -> scope.variables().put(variableDeclarationNode.name().toLowerCase(), new Declaration.Variable(variableDeclarationNode.name(), getType(variableDeclarationNode.type(), scope, errors)));
+            case Node.ConstantsDeclarationNode constantsDeclarationNode ->
+                    constantsDeclarationNode.constants().forEach(constant -> semanticAnalysis(constant, scope, errors));
             case Node.ConstantNode constantNode -> {
                 if (scope.constant(constantNode.name()).isPresent()) {
                     errors.add(new Error("Constant " + constantNode.name() + " already declared", constantNode.location()));
                 } else scope.constants().put(constantNode.name().toLowerCase(), new Declaration.Constant(constantNode.name(), getType(constantNode, scope, errors)));
             }
-            case Node.CommandsNode commandsNode -> {
-                commandsNode.commands().forEach(command -> semanticAnalysis(command, scope, errors));
-            }
+            case Node.CommandsNode commandsNode -> commandsNode.commands().forEach(command -> semanticAnalysis(command, scope, errors));
             case Node.CommandNode commandNode -> typeCheckCommand(commandNode.command(), scope, errors);
 
             case Node.CompundNode(var nodes, _) ->  nodes.forEach(n -> semanticAnalysis(n, scope, errors));
 
             default -> errors.add(new Error("Unsupported node: " + node.getClass(), node.location()));
-        };
+        }
     }
 
     private static void typeCheckCommand(Node command, Scope scope, List<Error> errors) {
@@ -260,7 +257,7 @@ public class TypeChecker {
                         errors.add(new Error("Assignment of different types: " + arrayType.type() + " and " + exprType, assignmentNode.location()));
                     }
                 } else if (!areTypesCompatible(idType, exprType)) {
-                    errors.add(new Error(assignmentNode.location() + ": Assignment of different types: " + idType + " and " + exprType, assignmentNode.location()));
+                    errors.add(new Error("Assignment of different types: " + idType + " and " + exprType, assignmentNode.location()));
                 }
             }
 
@@ -599,7 +596,7 @@ public class TypeChecker {
                     errors.add(new Error(idNode.id() + " not declared", idNode.location()));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
-                yield getType(declaration.get(), scope, errors);
+                yield getType(declaration.get());
             }
 
             case Node.BinaryNode binaryNode -> getType(binaryNode, scope, errors);
@@ -629,9 +626,7 @@ public class TypeChecker {
                 yield function.get().returnType();
             }
 
-            case Node.CompundNode compundNode -> {
-                yield null;
-            }
+            case Node.CompundNode _ -> null;
 
             case Node.RangeNode(Node start, Node end, _) -> {
                 Type startType = getType(start, scope, errors);
@@ -661,12 +656,12 @@ public class TypeChecker {
         };
     }
 
-    private static Type getType(Declaration declaration, Scope scope, List<Error> errors) {
+    private static Type getType(Declaration declaration) {
         return switch (declaration) {
-            case Declaration.Variable variable -> variable.type();
-            case Declaration.Constant constant -> constant.type();
-            case Declaration.Function function -> function.returnType();
-            case Declaration.Procedure procedure -> Type.PrimitiveTypes.UNDECLARED;
+            case Declaration.Variable(_, var type) -> type;
+            case Declaration.Constant(_, var type) -> type;
+            case Declaration.Function(_, var returnType, _) -> returnType;
+            case Declaration.Procedure _ -> Type.PrimitiveTypes.UNDECLARED;
             case Declaration.UserDefinedType userDefinedType -> userDefinedType;
         };
     }
