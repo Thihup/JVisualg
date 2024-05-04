@@ -11,17 +11,13 @@ public record Location(
     public Location {
     }
 
-    public static Location fromRuleContext(ParserRuleContext ctx) {
-        return new Location(
-            ctx.start.getLine(),
-            ctx.start.getCharPositionInLine(),
-            ctx.stop.getLine(),
-            ctx.stop.getCharPositionInLine()
-        );
+    public String toString() {
+        return startLine + ":" + startColumn + "-" + endLine + ":" + endColumn;
     }
 
-    public String toString() {
-        return startLine + ":" + startColumn;
+    public boolean isInside(Location other) {
+        return startLine >= other.startLine && endLine <= other.endLine &&
+            startColumn >= other.startColumn && endColumn <= other.endColumn;
     }
 
 }

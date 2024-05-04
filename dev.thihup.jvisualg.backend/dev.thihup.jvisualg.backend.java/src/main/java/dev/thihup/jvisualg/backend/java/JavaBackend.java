@@ -11,50 +11,33 @@ public class JavaBackend {
         return switch (node) {
             case null -> "// to be implemented (null?)";
             case Node.AlgoritimoNode(
-                    String text, Node declarations, Node commands, _
+                    Node.StringLiteralNode text, Node declarations, Node commands, _
             ) -> """
                     // %s
                     %s
                     void main() {
                         %s
                     }
-                    """.formatted(text, javaOutput(declarations), javaOutput(commands));
-
-            case Node.DeclarationsNode(
-                    List<Node> variableDeclarationContexts, List<Node> registroDeclarationContexts,
-                    List<Node> subprogramDeclarationContexts, List<Node> constantsDeclarationContexts,
-                    _, _
-            ) -> """
-                    %s
-                    %s
-                    %s
-                    %s
-                    """.formatted(constantsDeclarationContexts.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")),
-                    variableDeclarationContexts.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")),
-                    registroDeclarationContexts.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")),
-                    subprogramDeclarationContexts.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
+                    """.formatted(text.value(), javaOutput(declarations), javaOutput(commands));
 
 
             case Node.CompundNode(
                     List<? extends Node> nodes, _
             ) -> nodes.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t"));
 
-            case Node.VariableDeclarationNode(String name, Node.ArrayTypeNode type, _) ->
-                    "%s%s %s = new %s%s;".formatted(javaOutput(type.type()), "[]".repeat((int) type.dimensions()), name, javaOutput(type.type()), type.sizes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][", "[", "]")));
+            case Node.VariableDeclarationNode(Node.IdNode name, Node.ArrayTypeNode type, _) ->
+                    "%s%s %s = new %s%s;".formatted(javaOutput(type.type()), "[]".repeat((int) type.dimensions()), name.id(), javaOutput(type.type()), type.sizes().nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][", "[", "]")));
 
-            case Node.VariableDeclarationNode(String name, Node type, _) -> "%s %s;".formatted(javaOutput(type), name);
+            case Node.VariableDeclarationNode(Node.IdNode name, Node type, _) -> "%s %s;".formatted(javaOutput(type), name.id());
 
-            case Node.ConstantsDeclarationNode(List<Node.ConstantNode> constants, _) ->
-                    constants.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t"));
-
-            case Node.ConstantNode(String name, Node.IntLiteralNode(int value, _), _) ->
-                    "private static final int %s = %s;".formatted(name, value);
-            case Node.ConstantNode(String name, Node.RealLiteralNode(double value, _), _) ->
-                    "private static final double %s = %s;".formatted(name, value);
-            case Node.ConstantNode(String name, Node.StringLiteralNode(String value, _), _) ->
-                    "private static final String %s = %s;".formatted(name, value);
-            case Node.ConstantNode(String name, Node.BooleanLiteralNode(boolean value, _), _) ->
-                    "private static final boolean %s = %s;".formatted(name, value);
+            case Node.ConstantNode(Node.IdNode name, Node.IntLiteralNode(int value, _), _) ->
+                    "private static final int %s = %s;".formatted(name.id(), value);
+            case Node.ConstantNode(Node.IdNode name, Node.RealLiteralNode(double value, _), _) ->
+                    "private static final double %s = %s;".formatted(name.id(), value);
+            case Node.ConstantNode(Node.IdNode name, Node.StringLiteralNode(String value, _), _) ->
+                    "private static final String %s = %s;".formatted(name.id(), value);
+            case Node.ConstantNode(Node.IdNode name, Node.BooleanLiteralNode(boolean value, _), _) ->
+                    "private static final boolean %s = %s;".formatted(name.id(), value);
 
 
             case Node.TypeNode(String type, _) -> switch (type.toLowerCase()) {
@@ -64,11 +47,6 @@ public class JavaBackend {
                 case "logico" -> "boolean";
                 default -> type;
             };
-
-            case Node.CommandsNode(List<Node> commands, _) ->
-                    commands.stream().map(JavaBackend::javaOutput).map("\t"::concat).collect(Collectors.joining("\n\t"));
-
-            case Node.CommandNode(Node command, _) -> javaOutput(command);
 
             case Node.InterrompaCommandNode(_) -> "break;";
 
@@ -83,35 +61,35 @@ public class JavaBackend {
                     "%s += %s".formatted(javaOutput(expr), javaOutput(value));
 
 
-            case Node.ForCommandNode(Node.IdNode identifier, Node startValue, Node endValue, Node step, List<Node> commands, _) -> {
+            case Node.ForCommandNode(Node.IdNode identifier, Node startValue, Node endValue, Node step, Node.CompundNode commands, _) -> {
                 yield """
                         for (%s = %s; %s <= %s; %s += %s) {
                             %s
                         }
-                        """.formatted(javaOutput(identifier), javaOutput(startValue), javaOutput(identifier), javaOutput(endValue), javaOutput(identifier), javaOutput(step), commands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining()));
+                        """.formatted(javaOutput(identifier), javaOutput(startValue), javaOutput(identifier), javaOutput(endValue), javaOutput(identifier), javaOutput(step), commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining()));
             }
 
-            case Node.WhileCommandNode(Node condition, List<Node> commands, boolean atTheEnd, _) -> {
+            case Node.WhileCommandNode(Node condition, Node.CompundNode commands, boolean atTheEnd, _) -> {
                 if (atTheEnd) {
                     yield """
                             do {
                                 %s
                             } while (%s);
-                            """.formatted(commands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")), javaOutput(condition));
+                            """.formatted(commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")), javaOutput(condition));
                 } else {
                     yield """
                             while (%s) {
                                 %s
                             }
-                            """.formatted(javaOutput(condition), commands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
+                            """.formatted(javaOutput(condition), commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
                 }
             }
 
-            case Node.WriteCommandNode(boolean newLine, List<Node> writeList, _) -> {
+            case Node.WriteCommandNode(boolean newLine, Node.CompundNode writeList, _) -> {
                 if (newLine) {
-                    yield "System.out.println(%s);".formatted(writeList.stream().map(JavaBackend::javaOutput).collect(Collectors.joining(" + ")));
+                    yield "System.out.println(%s);".formatted(writeList.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(" + ")));
                 } else {
-                    yield "System.out.print(%s);".formatted(writeList.stream().map(JavaBackend::javaOutput).collect(Collectors.joining(" + ")));
+                    yield "System.out.print(%s);".formatted(writeList.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(" + ")));
                 }
             }
 
@@ -128,14 +106,14 @@ public class JavaBackend {
             }
 
             case Node.ConditionalCommandNode(
-                    Node condition, List<Node> thenCommands, List<Node> elseCommands, Location _
+                    Node condition, Node.CompundNode thenCommands, Node.CompundNode elseCommands, Location _
             ) -> {
-                if (elseCommands.isEmpty()) {
+                if (elseCommands.nodes().isEmpty()) {
                     yield """
                             if (%s) {
                                 %s
                             }
-                            """.formatted(javaOutput(condition), thenCommands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
+                            """.formatted(javaOutput(condition), thenCommands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
                 } else {
                     yield """
                             if (%s) {
@@ -143,15 +121,15 @@ public class JavaBackend {
                             } else {
                                 %s
                             }
-                            """.formatted(javaOutput(condition), thenCommands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")), elseCommands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
+                            """.formatted(javaOutput(condition), thenCommands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")), elseCommands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
                 }
             }
 
-            case Node.RegistroDeclarationNode(String name, List<Node> variableDeclarationContexts, _) -> """
+            case Node.RegistroDeclarationNode(Node.IdNode name, Node.CompundNode variableDeclarationContexts, _) -> """
                     class %s {
                         %s
                     }
-                    """.formatted(name, variableDeclarationContexts.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
+                    """.formatted(name, variableDeclarationContexts.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
 
             case Node.IntLiteralNode(int value, _) -> String.valueOf(value);
 
@@ -163,25 +141,25 @@ public class JavaBackend {
 
             case Node.IdNode(String id, _) -> id;
 
-            case Node.ArrayAccessNode(Node.IdNode id, List<Node> indexes, _) ->
-                    "%s[%s-1]".formatted(javaOutput(id), indexes.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][")));
+            case Node.ArrayAccessNode(Node.IdNode id, Node.CompundNode indexes, _) ->
+                    "%s[%s-1]".formatted(javaOutput(id), indexes.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][")));
 
 
-            case Node.FunctionCallNode(String name, List<Node> args, Location location) ->
-                    "%s(%s)".formatted(name, args.stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
+            case Node.FunctionCallNode(Node.IdNode name, Node.CompundNode args, Location location) ->
+                    "%s(%s)".formatted(name.id(), args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
 
-            case Node.ProcedureCallNode(String name, List<Node> args, Location location) ->
-                    "%s(%s)".formatted(name, args.stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
+            case Node.ProcedureCallNode(Node.IdNode name, Node.CompundNode args, Location location) ->
+                    "%s(%s)".formatted(name.id(), args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
 
             case Node.FunctionDeclarationNode(
-                    String name, Node type, List<Node> args, List<Node> references, List<Node> declarations, List<Node> commands, _
+                    Node.IdNode name, Node type, Node.CompundNode args, Node.CompundNode references, Node.CompundNode declarations, Node.CompundNode commands, _
             ) ->
-                    "%s %s(%s) { %s }".formatted(javaOutput(type), name, args.stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
+                    "%s %s(%s) { %s }".formatted(javaOutput(type), name, args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
 
             case Node.ProcedureDeclarationNode(
-                    String name, List<Node> args, List<Node> references, List<Node> declarations, List<Node> commands, _
+                    Node.IdNode name, Node.CompundNode args, Node.CompundNode references, Node.CompundNode declarations, Node.CompundNode commands, _
             ) ->
-                    "void %s(%s) { %s }".formatted(name, args.stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
+                    "void %s(%s) { %s }".formatted(name, args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
 
             case Node.DivNode(Node left, Node right, _) -> "%s / %s".formatted(javaOutput(left), javaOutput(right));
             case Node.MulNode(Node left, Node right, _) -> "%s * %s".formatted(javaOutput(left), javaOutput(right));

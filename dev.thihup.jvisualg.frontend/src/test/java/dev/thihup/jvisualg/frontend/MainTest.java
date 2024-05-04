@@ -1,6 +1,5 @@
 package dev.thihup.jvisualg.frontend;
 
-import dev.thihup.jvisualg.frontend.impl.antlr.VisuAlgParser;
 import dev.thihup.jvisualg.frontend.node.Node;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -8,6 +7,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 class MainTest {
@@ -15,16 +15,16 @@ class MainTest {
     @ParameterizedTest
     @MethodSource("examplesV25")
     void testExamplesV25(Path path) throws Throwable {
-        Main.Result astResult = Main.buildAST(Files.newInputStream(path));
-        Main.Result typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
+        ASTResult astResult = Main.buildAST(Files.newInputStream(path));
+        TypeCheckerResult typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
         typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
 
     @ParameterizedTest
     @MethodSource("examplesV30")
     void testExamplesV30(Path path) throws Throwable {
-        Main.Result astResult = Main.buildAST(Files.newInputStream(path));
-        Main.Result typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
+        ASTResult astResult = Main.buildAST(Files.newInputStream(path));
+        TypeCheckerResult typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
         typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
 

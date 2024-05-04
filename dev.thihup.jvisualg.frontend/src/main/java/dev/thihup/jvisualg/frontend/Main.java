@@ -6,7 +6,6 @@ import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
 import org.antlr.v4.runtime.*;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,31 +20,28 @@ public class Main {
     }
 
 
-    public static Result buildAST(InputStream code) throws IOException {
-        CharStream charStream = CharStreams.fromStream(code, StandardCharsets.ISO_8859_1);
-
+    public static ASTResult buildAST(InputStream code) {
         var errorListener = new BaseErrorListener();
-
-        var lexer = new VisuAlgLexer(new LowecaseCharStream(charStream));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(errorListener);
-
-        var parser = new VisuAlgParser(new CommonTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(errorListener);
-
         try {
+            CharStream charStream = CharStreams.fromStream(code, StandardCharsets.ISO_8859_1);
+
+            var lexer = new VisuAlgLexer(new LowecaseCharStream(charStream));
+            lexer.removeErrorListeners();
+            lexer.addErrorListener(errorListener);
+
+            var parser = new VisuAlgParser(new CommonTokenStream(lexer));
+            parser.removeErrorListeners();
+            parser.addErrorListener(errorListener);
+
             VisuAlgParser.AlgorithmContext ctx = parser.algorithm();
             var visitor = new VisuAlgParserVisitor();
             Node rootNode = visitor.visit(ctx);
 
-            return new Result(Optional.ofNullable(rootNode), errorListener.errors);
+            return new ASTResult(Optional.ofNullable(rootNode), errorListener.errors);
         } catch (Exception e) {
-            return new Result(Optional.empty(), errorListener.errors);
+            return new ASTResult(Optional.empty(), errorListener.errors);
         }
     }
-
-    public record Result(Optional<Node> node, List<Error> errors) {}
 
 
     static class BaseErrorListener extends org.antlr.v4.runtime.BaseErrorListener {
