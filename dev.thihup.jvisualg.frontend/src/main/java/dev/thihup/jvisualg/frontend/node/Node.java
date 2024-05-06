@@ -110,7 +110,7 @@ public sealed interface Node {
             case DebugCommandNode debugCommandNode -> Stream.of(debugCommandNode.expr());
             case ArquivoCommandNode _, AleatorioCommandNode _, TimerCommandNode _, PausaCommandNode _, EcoCommandNode _,
                  CronometroCommandNode _, LimpatelaCommandNode _ -> Stream.of();
-            case ArrayTypeNode(var type, _, CompundNode(var nodes, _), _) -> {
+            case ArrayTypeNode(var type, CompundNode(var nodes, _), _) -> {
                 Stream<Node> typeStream = Stream.of(type);
                 Stream<Node> sizes = nodes.stream();
                 yield Stream.concat(typeStream, sizes);
@@ -579,7 +579,7 @@ public sealed interface Node {
         }
     }
 
-    record ArrayTypeNode(TypeNode type, long dimensions, CompundNode sizes, Optional<Location> location) implements Node {
+    record ArrayTypeNode(TypeNode type, CompundNode sizes, Optional<Location> location) implements Node {
         public ArrayTypeNode {
             Objects.requireNonNull(type);
             Objects.requireNonNull(sizes);

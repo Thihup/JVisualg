@@ -8,10 +8,7 @@ import dev.thihup.jvisualg.frontend.node.Node.*;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -22,7 +19,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
                 ctx.start.getLine(),
                 ctx.start.getCharPositionInLine(),
                 ctx.stop.getLine(),
-                ctx.stop.getCharPositionInLine()
+                ctx.stop.getCharPositionInLine() + ctx.stop.getText().length() - 1
         ));
     }
 
@@ -31,7 +28,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
                 ctx.getSymbol().getLine(),
                 ctx.getSymbol().getCharPositionInLine(),
                 ctx.getSymbol().getLine(),
-                ctx.getSymbol().getCharPositionInLine() + ctx.getSymbol().getText().length()
+                ctx.getSymbol().getCharPositionInLine() + ctx.getSymbol().getText().length() - 1
         ));
     }
 
@@ -100,6 +97,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         );
     }
 
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private Collector<Node, ?, CompundNode> toCompundNode(Optional<Location> location) {
         return Collectors.collectingAndThen(Collectors.toUnmodifiableList(), node -> new CompundNode(node, location));
     }
@@ -162,32 +160,32 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
             return new TypeNode(new StringLiteralNode(ctx.getText(), fromRuleContext(ctx)), fromRuleContext(ctx));
         List<TerminalNode> range = ctx.RANGE();
 
-
         CompundNode list = range.stream()
                 .map(this::rangeToNode)
                 .collect(toCompundNode(fromRuleContext(ctx)));
-        return new ArrayTypeNode((TypeNode) visit(ctx.type()), range.size(), list, fromRuleContext(ctx));
+        return new ArrayTypeNode((TypeNode) visit(ctx.type()), list, fromRuleContext(ctx));
     }
 
     private Node rangeToNode(TerminalNode ctx) {
-        // range is (number)..(number)  or (number)..(text) or (text)..(number) or (text)..(text)
-        // and the returned node should be a SubNode from the second number to the first number
         String[] values = ctx.getText().split("\\.\\.");
         assert values.length == 2;
-        Integer min, max;
+        Node min, max;
         try {
-            min = Integer.parseInt(values[0]);
+            min = new IntLiteralNode(Integer.parseInt(values[0]), fromTerminalNode(ctx));
         } catch (NumberFormatException e) {
-            min = null;
+            min = new IdNode(values[0], fromTerminalNode(ctx));
         }
         try {
-            max = Integer.parseInt(values[1]);
+            max = new IntLiteralNode(Integer.parseInt(values[1]), fromTerminalNode(ctx));
         } catch (NumberFormatException e) {
-            max = null;
+            max = new IdNode(values[1], fromTerminalNode(ctx));
         }
 
-        return new AddNode(new SubNode(max != null ? new IntLiteralNode(max, Optional.empty()) : new IdNode(values[1], Optional.empty()),
-                min != null ? new IntLiteralNode(min, Optional.empty()) : new IdNode(values[0], Optional.empty()), Optional.empty()), new IntLiteralNode(1, Optional.empty()), Optional.empty());
+        return new RangeNode(
+                min,
+                max,
+                fromTerminalNode(ctx)
+        );
     }
 
     @Override
@@ -233,10 +231,10 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
             .stream()
             .map(this::visit)
             .reduce((result, element) -> switch (element) {
-                case ArrayAccessNode(_, CompundNode indexes, _) ->
-                        new ArrayAccessNode(result, indexes, fromRuleContext(ctx));
-                case MemberAccessNode(_, Node expr, _) ->
-                        new MemberAccessNode(result, expr, fromRuleContext(ctx));
+                case ArrayAccessNode(_, CompundNode indexes, var location) ->
+                        new ArrayAccessNode(result, indexes, location);
+                case MemberAccessNode(_, Node expr, var location) ->
+                        new MemberAccessNode(result, expr, location);
                 case IdNode id -> new IdNode(id.id(), fromRuleContext(ctx));
                 default -> throw new IllegalStateException();
             })
@@ -345,7 +343,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitParaCommand(VisuAlgParser.ParaCommandContext ctx) {
-        IdNode idOrArray = new IdNode(ctx.ID().getText(), fromRuleContext(ctx));
+        IdNode idOrArray = visitId(ctx.ID());
         Node endValue = ctx.expr(1) instanceof VisuAlgParser.ExprContext endValueExpr ? visit(endValueExpr) : EmptyNode.INSTANCE;
         Node step = ctx.expr(2) instanceof VisuAlgParser.ExprContext stepValue ? visit(stepValue) : new IntLiteralNode(1, Optional.empty());
         CompundNode commands = ctx.commands().command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));

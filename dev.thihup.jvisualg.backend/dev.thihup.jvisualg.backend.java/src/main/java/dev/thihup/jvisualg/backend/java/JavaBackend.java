@@ -26,7 +26,7 @@ public class JavaBackend {
             ) -> nodes.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t"));
 
             case Node.VariableDeclarationNode(Node.IdNode name, Node.ArrayTypeNode type, _) ->
-                    "%s%s %s = new %s%s;".formatted(javaOutput(type.type()), "[]".repeat((int) type.dimensions()), name.id(), javaOutput(type.type()), type.sizes().nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][", "[", "]")));
+                    "%s%s %s = new %s%s;".formatted(javaOutput(type.type()), "[]".repeat(type.sizes().nodes().size()), name.id(), javaOutput(type.type()), type.sizes().nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][", "[", "]")));
 
             case Node.VariableDeclarationNode(Node.IdNode name, Node type, _) -> "%s %s;".formatted(javaOutput(type), name.id());
 
