@@ -267,7 +267,7 @@ public class VisualgLanguageServer implements LanguageServer, LanguageClientAwar
             List<Node> possibleMatches = findPossibleMatches(node, positionToLocation(params.getPosition()));
 
             return findMostSpecificNode(possibleMatches)
-                    .map(x -> new DocumentHighlight(locationToRange(x.location()), DocumentHighlightKind.Text))
+                    .map(x -> new DocumentHighlight(locationToRange(x.location().orElse(Location.EMPTY)), DocumentHighlightKind.Text))
                     .map(List::of)
                     .orElse(List.of());
         });
@@ -290,7 +290,7 @@ public class VisualgLanguageServer implements LanguageServer, LanguageClientAwar
             return List.of();
 
         return Stream.concat(Stream.of(node), node.visitChildren())
-                .filter(child -> child.location() != null && position.isInside(child.location()))
+                .filter(child -> position.isInside(child.location().orElse(Location.EMPTY)))
                 .toList();
     }
 

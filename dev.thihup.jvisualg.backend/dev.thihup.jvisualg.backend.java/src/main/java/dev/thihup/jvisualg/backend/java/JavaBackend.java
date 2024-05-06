@@ -40,7 +40,7 @@ public class JavaBackend {
                     "private static final boolean %s = %s;".formatted(name.id(), value);
 
 
-            case Node.TypeNode(String type, _) -> switch (type.toLowerCase()) {
+            case Node.TypeNode(Node.StringLiteralNode(String type, _), _) -> switch (type.toLowerCase()) {
                 case "inteiro" -> "int";
                 case "real" -> "double";
                 case "caracter", "caractere", "literal" -> "String";
@@ -93,7 +93,7 @@ public class JavaBackend {
                 }
             }
 
-            case Node.WriteItemNode(Node expr, Integer spaces, Integer precision, _) -> {
+            case Node.WriteItemNode(Node expr, Node spaces, Node precision, _) -> {
                 if (spaces != null && precision != null) {
                     yield "String.format(\"%%%d.%df\", %s)".formatted(spaces, precision, javaOutput(expr));
                 } else if (spaces != null) {
@@ -106,7 +106,7 @@ public class JavaBackend {
             }
 
             case Node.ConditionalCommandNode(
-                    Node condition, Node.CompundNode thenCommands, Node.CompundNode elseCommands, Location _
+                    Node condition, Node.CompundNode thenCommands, Node.CompundNode elseCommands, _
             ) -> {
                 if (elseCommands.nodes().isEmpty()) {
                     yield """
@@ -145,10 +145,10 @@ public class JavaBackend {
                     "%s[%s-1]".formatted(javaOutput(id), indexes.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][")));
 
 
-            case Node.FunctionCallNode(Node.IdNode name, Node.CompundNode args, Location location) ->
+            case Node.FunctionCallNode(Node.IdNode name, Node.CompundNode args, _) ->
                     "%s(%s)".formatted(name.id(), args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
 
-            case Node.ProcedureCallNode(Node.IdNode name, Node.CompundNode args, Location location) ->
+            case Node.ProcedureCallNode(Node.IdNode name, Node.CompundNode args, _) ->
                     "%s(%s)".formatted(name.id(), args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
 
             case Node.FunctionDeclarationNode(

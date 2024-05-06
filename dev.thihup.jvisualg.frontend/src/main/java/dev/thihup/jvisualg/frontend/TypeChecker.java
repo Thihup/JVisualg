@@ -185,7 +185,7 @@ public class TypeChecker {
             case Node.ConstantNode constantNode -> handleConstantNode(scope, errors, constantNode);
             case Node.CompundNode(var nodes, _) -> handleCompoundNodeSemantic(scope, errors, nodes);
             case Node.CommandNode commandNode -> typeCheckCommand(commandNode, scope, errors);
-            default -> errors.add(new Error("Unsupported node: " + node.getClass(), node.location()));
+            default -> errors.add(new Error("Unsupported node: " + node.getClass(), node.location().orElse(Location.EMPTY)));
         }
     }
 
@@ -195,36 +195,36 @@ public class TypeChecker {
 
     private static void handleConstantNode(Scope scope, List<Error> errors, Node.ConstantNode constantNode) {
         if (scope.constant(constantNode.name().id()).isPresent()) {
-            errors.add(new Error("Constant " + constantNode.name().id() + " already declared", constantNode.location()));
+            errors.add(new Error("Constant " + constantNode.name().id() + " already declared", constantNode.location().orElse(Location.EMPTY)));
         } else
-            scope.constants().put(constantNode.name().id().toLowerCase(), new Declaration.Constant(constantNode.name().id(), getType(constantNode, scope, errors), constantNode.location()));
+            scope.constants().put(constantNode.name().id().toLowerCase(), new Declaration.Constant(constantNode.name().id(), getType(constantNode, scope, errors), constantNode.location().orElse(Location.EMPTY)));
     }
 
     private static void handleVariableDeclarationNode(Scope scope, List<Error> errors, Node.VariableDeclarationNode variableDeclarationNode) {
-        scope.variables().put(variableDeclarationNode.name().id().toLowerCase(), new Declaration.Variable(variableDeclarationNode.name().id(), getType(variableDeclarationNode.type(), scope, errors), variableDeclarationNode.location()));
+        scope.variables().put(variableDeclarationNode.name().id().toLowerCase(), new Declaration.Variable(variableDeclarationNode.name().id(), getType(variableDeclarationNode.type(), scope, errors), variableDeclarationNode.location().orElse(Location.EMPTY)));
     }
 
     private static void handleRegistroDeclarationNode(Scope scope, List<Error> errors, Node.RegistroDeclarationNode registroDeclarationNode) {
         if (scope.variable(registroDeclarationNode.name().id()).isPresent()) {
-            errors.add(new Error("Registro " + registroDeclarationNode.name().id() + " already declared", registroDeclarationNode.location()));
+            errors.add(new Error("Registro " + registroDeclarationNode.name().id() + " already declared", registroDeclarationNode.location().orElse(Location.EMPTY)));
         } else {
             Scope registroScope = Scope.newScope(registroDeclarationNode.name().id(), scope);
             registroDeclarationNode.variableDeclarationContexts().nodes().forEach(variableDeclarationContext -> semanticAnalysis(variableDeclarationContext, registroScope, errors));
-            scope.userDefinedTypes.put(registroDeclarationNode.name().id().toLowerCase(), new Declaration.UserDefinedType(registroDeclarationNode.name().id(), registroScope.variables(), registroDeclarationNode.location()));
+            scope.userDefinedTypes.put(registroDeclarationNode.name().id().toLowerCase(), new Declaration.UserDefinedType(registroDeclarationNode.name().id(), registroScope.variables(), registroDeclarationNode.location().orElse(Location.EMPTY)));
         }
     }
 
     private static void handleProcedureDeclarationNode(Scope scope, List<Error> errors, Node.ProcedureDeclarationNode procedureDeclarationNode) {
         if (scope.procedure(procedureDeclarationNode.name().id()).isPresent()) {
-            errors.add(new Error("Procedure " + procedureDeclarationNode.name().id() + " already declared", procedureDeclarationNode.location()));
+            errors.add(new Error("Procedure " + procedureDeclarationNode.name().id() + " already declared", procedureDeclarationNode.location().orElse(Location.EMPTY)));
         } else {
             SequencedMap<String, Declaration.Variable> parameters = procedureDeclarationNode.parameters().nodes().stream()
                     .filter(x -> x instanceof Node.VariableDeclarationNode)
                     .map(Node.VariableDeclarationNode.class::cast)
-                    .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location()))
+                    .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location().orElse(Location.EMPTY)))
                     .collect(Collectors.toMap(Declaration.Variable::name, x -> x, (a, _) -> a, LinkedHashMap::new));
 
-            scope.procedures.put(procedureDeclarationNode.name().id().toLowerCase(), new Declaration.Procedure(procedureDeclarationNode.name().id(), parameters, procedureDeclarationNode.location()));
+            scope.procedures.put(procedureDeclarationNode.name().id().toLowerCase(), new Declaration.Procedure(procedureDeclarationNode.name().id(), parameters, procedureDeclarationNode.location().orElse(Location.EMPTY)));
 
             Scope newScope = Scope.newScope(procedureDeclarationNode.name().id(), scope);
             procedureDeclarationNode.parameters().nodes().forEach(parameter -> semanticAnalysis(parameter, newScope, errors));
@@ -235,16 +235,16 @@ public class TypeChecker {
 
     private static void handleFunctionDeclarationNode(Scope scope, List<Error> errors, Node.FunctionDeclarationNode functionDeclarationNode) {
         if (scope.function(functionDeclarationNode.name().id()).isPresent()) {
-            errors.add(new Error("Function " + functionDeclarationNode.name().id() + " already declared", functionDeclarationNode.location()));
+            errors.add(new Error("Function " + functionDeclarationNode.name().id() + " already declared", functionDeclarationNode.location().orElse(Location.EMPTY)));
         } else {
             Type returnType = getType(functionDeclarationNode.returnType(), scope, errors);
             SequencedMap<String, Declaration.Variable> parameters = functionDeclarationNode.parameters().nodes().stream()
                     .filter(x -> x instanceof Node.VariableDeclarationNode)
                     .map(Node.VariableDeclarationNode.class::cast)
-                    .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location()))
+                    .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location().orElse(Location.EMPTY)))
                     .collect(Collectors.toMap(Declaration.Variable::name, x -> x, (a, _) -> a, LinkedHashMap::new));
 
-            scope.functions.put(functionDeclarationNode.name().id().toLowerCase(), new Declaration.Function(functionDeclarationNode.name().id(), returnType, parameters, functionDeclarationNode.location()));
+            scope.functions.put(functionDeclarationNode.name().id().toLowerCase(), new Declaration.Function(functionDeclarationNode.name().id(), returnType, parameters, functionDeclarationNode.location().orElse(Location.EMPTY)));
 
             Scope newScope = Scope.newScope(functionDeclarationNode.name().id(), scope);
             functionDeclarationNode.parameters().nodes().forEach(parameter -> semanticAnalysis(parameter, newScope, errors));
@@ -262,7 +262,7 @@ public class TypeChecker {
         switch (command) {
             case Node.InterrompaCommandNode interrompaCommandNode ->
                     handleInterrompaCommand(scope, errors, interrompaCommandNode);
-            case Node.ReturnNode(var node, var location) -> handleReturnNode(scope, errors, node, location);
+            case Node.ReturnNode(var node, var location) -> handleReturnNode(scope, errors, node, location.orElse(Location.EMPTY));
 
             case Node.DosNode dosNode -> handleDosNode(scope, errors, dosNode);
 
@@ -278,51 +278,51 @@ public class TypeChecker {
 
             case Node.IdNode idNode -> handleIdNode(scope, errors, idNode);
 
-            case Node.DivNode(Node left, Node right, Location location) ->
-                    handleDivNode(scope, errors, left, right, location);
+            case Node.DivNode(Node left, Node right, var location) ->
+                    handleDivNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.ModNode(Node left, Node right, Location location) ->
-                    handleModNode(scope, errors, left, right, location);
+            case Node.ModNode(Node left, Node right, var location) ->
+                    handleModNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.AddNode(Node left, Node right, Location location) ->
-                    handleAddNode(scope, errors, left, right, location);
+            case Node.AddNode(Node left, Node right, var location) ->
+                    handleAddNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.SubNode(Node left, Node right, Location location) ->
-                    handleSubNode(scope, errors, left, right, location);
+            case Node.SubNode(Node left, Node right, var location) ->
+                    handleSubNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.MulNode(Node left, Node right, Location location) ->
-                    handleMulNode(scope, errors, left, right, location);
+            case Node.MulNode(Node left, Node right, var location) ->
+                    handleMulNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.PowNode(Node left, Node right, Location location) ->
-                    handlePowNode(scope, errors, left, right, location);
+            case Node.PowNode(Node left, Node right, var location) ->
+                    handlePowNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.AndNode(Node left, Node right, Location location) ->
-                    handleAndNode(scope, errors, left, right, location);
+            case Node.AndNode(Node left, Node right, var location) ->
+                    handleAndNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.OrNode(Node left, Node right, Location location) ->
-                    handleOrNode(scope, errors, left, right, location);
+            case Node.OrNode(Node left, Node right, var location) ->
+                    handleOrNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.NotNode(Node expr, Location location) -> handleNotNode(scope, errors, expr, location);
+            case Node.NotNode(Node expr, var location) -> handleNotNode(scope, errors, expr, location.orElse(Location.EMPTY));
 
-            case Node.EqNode(Node left, Node right, Location location) ->
-                    handleEqNode(scope, errors, left, right, location);
+            case Node.EqNode(Node left, Node right, var location) ->
+                    handleEqNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.NeNode(Node left, Node right, Location location) ->
-                    handleNeNode(scope, errors, left, right, location);
+            case Node.NeNode(Node left, Node right, var location) ->
+                    handleNeNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.LtNode(Node left, Node right, Location location) ->
-                    handleLtNode(scope, errors, left, right, location);
+            case Node.LtNode(Node left, Node right, var location) ->
+                    handleLtNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.LeNode(Node left, Node right, Location location) ->
-                    handleLeNode(scope, errors, left, right, location);
+            case Node.LeNode(Node left, Node right, var location) ->
+                    handleLeNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.GtNode(Node left, Node right, Location location) ->
-                    handleGtNode(scope, errors, left, right, location);
+            case Node.GtNode(Node left, Node right, var location) ->
+                    handleGtNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.GeNode(Node left, Node right, Location location) ->
-                    handleGeNode(scope, errors, left, right, location);
+            case Node.GeNode(Node left, Node right, var location) ->
+                    handleGeNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
-            case Node.NegNode(Node expr, Location location) -> handleNegNode(scope, errors, expr, location);
+            case Node.NegNode(Node expr, var location) -> handleNegNode(scope, errors, expr, location.orElse(Location.EMPTY));
 
             case Node.ConditionalCommandNode ifNode -> handleConditionalCommand(scope, errors, ifNode);
 
@@ -344,7 +344,7 @@ public class TypeChecker {
             case Node.LimpatelaCommandNode _, Node.EcoCommandNode _, Node.DebugCommandNode _, Node.PausaCommandNode _,
                  Node.CronometroCommandNode _ -> {
             }
-            default -> errors.add(new Error("Unsupported command node: " + command.getClass(), command.location()));
+            default -> errors.add(new Error("Unsupported command node: " + command.getClass(), command.location().orElse(Location.EMPTY)));
         }
     }
 
@@ -355,10 +355,10 @@ public class TypeChecker {
     private static void handleWriteItemNode(Scope scope, List<Error> errors, Node.WriteItemNode writeItemNode) {
         Type type = getType(writeItemNode.expr(), scope, errors);
         if (type == PrimitiveTypes.UNDECLARED) {
-            errors.add(new Error("Write command on undeclared type", writeItemNode.expr().location()));
+            errors.add(new Error("Write command on undeclared type", writeItemNode.expr().location().orElse(Location.EMPTY)));
         }
-        if (writeItemNode.precision() != null && type != PrimitiveTypes.REAL) {
-            errors.add(new Error("Write command with precision on non-real type: " + type, writeItemNode.expr().location()));
+        if (writeItemNode.precision() != Node.EmptyNode.INSTANCE && type != PrimitiveTypes.REAL) {
+            errors.add(new Error("Write command with precision on non-real type: " + type, writeItemNode.expr().location().orElse(Location.EMPTY)));
         }
     }
 
@@ -366,9 +366,9 @@ public class TypeChecker {
         for (Node id : readCommandNode.exprList().nodes()) {
             Type idType = getType(id, scope, errors);
             if (idType == PrimitiveTypes.UNDECLARED) {
-                errors.add(new Error("Read command on undeclared type", id.location()));
+                errors.add(new Error("Read command on undeclared type", id.location().orElse(Location.EMPTY)));
             } else if (idType instanceof Array) {
-                errors.add(new Error("Read command on array type: " + idType, id.location()));
+                errors.add(new Error("Read command on array type: " + idType, id.location().orElse(Location.EMPTY)));
             }
         }
     }
@@ -376,31 +376,31 @@ public class TypeChecker {
     private static void handleChooseCommandNode(Scope scope, List<Error> errors, Node.ChooseCommandNode commandNode) {
         Type type = getType(commandNode.expr(), scope, errors);
         if (!areNumbers(type, REAL) && type != CARACTERE) {
-            errors.add(new Error("Choose command with non-integer type: " + type, commandNode.expr().location()));
+            errors.add(new Error("Choose command with non-integer type: " + type, commandNode.expr().location().orElse(Location.EMPTY)));
         }
         commandNode.cases().nodes().forEach(cases -> {
             if (cases instanceof Node.ChooseCaseNode caseNode) {
                 if (!areTypesCompatible(type, getType(caseNode.value(), scope, errors))) {
-                    errors.add(new Error("Choose case with different types: " + type + " and " + getType(caseNode.value(), scope, errors), caseNode.value().location()));
+                    errors.add(new Error("Choose case with different types: " + type + " and " + getType(caseNode.value(), scope, errors), caseNode.value().location().orElse(Location.EMPTY)));
                 } else {
                     caseNode.commands().nodes().forEach(caseCommand -> typeCheckCommand(caseCommand, scope, errors));
                 }
             } else {
-                errors.add(new Error("Unsupported choose case node: " + cases.getClass(), cases.location()));
+                errors.add(new Error("Unsupported choose case node: " + cases.getClass(), cases.location().orElse(Location.EMPTY)));
             }
         });
     }
 
     private static void handleTimerCommand(List<Error> errors, Node.TimerCommandNode timerCommandNode) {
         if (timerCommandNode.value() < 0) {
-            errors.add(new Error("Timer command with negative argument: " + timerCommandNode.value(), timerCommandNode.location()));
+            errors.add(new Error("Timer command with negative argument: " + timerCommandNode.value(), timerCommandNode.location().orElse(Location.EMPTY)));
         }
     }
 
     private static void handleAleatorioCommandNode(List<Error> errors, Node.AleatorioCommandNode aleatorioCommandNode) {
         for (Integer arg : aleatorioCommandNode.args()) {
             if (arg < 0) {
-                errors.add(new Error("Aleatorio command with negative argument: " + arg, aleatorioCommandNode.location()));
+                errors.add(new Error("Aleatorio command with negative argument: " + arg, aleatorioCommandNode.location().orElse(Location.EMPTY)));
             }
         }
     }
@@ -408,21 +408,21 @@ public class TypeChecker {
     private static void handleFunctionCallNode(Scope scope, List<Error> errors, Node.FunctionCallNode functionCallNode) {
         Optional<Declaration.Function> function = scope.function(functionCallNode.name().id());
         if (function.isEmpty()) {
-            errors.add(new Error("Function " + functionCallNode.name().id() + " not declared", functionCallNode.location()));
+            errors.add(new Error("Function " + functionCallNode.name().id() + " not declared", functionCallNode.location().orElse(Location.EMPTY)));
         }
     }
 
     private static void handleProcedureCallNode(Scope scope, List<Error> errors, Node.ProcedureCallNode procedureCallNode) {
         Optional<Declaration.Procedure> procedure = scope.procedure(procedureCallNode.name().id());
         if (procedure.isEmpty()) {
-            errors.add(new Error("Procedure " + procedureCallNode.name().id() + " not declared", procedureCallNode.location()));
+            errors.add(new Error("Procedure " + procedureCallNode.name().id() + " not declared", procedureCallNode.location().orElse(Location.EMPTY)));
         }
     }
 
     private static void handleConditionalCommand(Scope scope, List<Error> errors, Node.ConditionalCommandNode ifNode) {
         Type conditionType = getType(ifNode.expr(), scope, errors);
         if (conditionType != PrimitiveTypes.LOGICO) {
-            errors.add(new Error("If command with non-boolean condition:" + conditionType, ifNode.expr().location()));
+            errors.add(new Error("If command with non-boolean condition:" + conditionType, ifNode.expr().location().orElse(Location.EMPTY)));
         }
         ifNode.commands().nodes().forEach(c -> typeCheckCommand(c, scope, errors));
         ifNode.elseCommands().nodes().forEach(c -> typeCheckCommand(c, scope, errors));
@@ -558,19 +558,19 @@ public class TypeChecker {
 
     private static void handleIdNode(Scope scope, List<Error> errors, Node.IdNode idNode) {
         if (scope.declaration(idNode.id()).isEmpty()) {
-            errors.add(new Error(idNode.id() + " not declared", idNode.location()));
+            errors.add(new Error(idNode.id() + " not declared", idNode.location().orElse(Location.EMPTY)));
         }
     }
 
     private static void handleArrayAccessNode(Scope scope, List<Error> errors, Node.ArrayAccessNode arrayAccessNode) {
         Type idType = getType(arrayAccessNode.node(), scope, errors);
         if (!(idType instanceof Array)) {
-            errors.add(new Error("Array access on a non-array type:" + idType, arrayAccessNode.node().location()));
+            errors.add(new Error("Array access on a non-array type:" + idType, arrayAccessNode.node().location().orElse(Location.EMPTY)));
         }
         for (Node index : arrayAccessNode.indexes().nodes()) {
             Type indexType = getType(index, scope, errors);
             if (indexType != PrimitiveTypes.INTEIRO) {
-                errors.add(new Error("Array access with non-integer index: " + indexType, index.location()));
+                errors.add(new Error("Array access with non-integer index: " + indexType, index.location().orElse(Location.EMPTY)));
             }
         }
     }
@@ -578,7 +578,7 @@ public class TypeChecker {
     private static void handleWhileCommand(Scope scope, List<Error> errors, Node.WhileCommandNode whileCommandNode) {
         Type testType = getType(whileCommandNode.test(), scope, errors);
         if (testType != PrimitiveTypes.LOGICO) {
-            errors.add(new Error("While command with non-boolean type: " + testType, whileCommandNode.test().location()));
+            errors.add(new Error("While command with non-boolean type: " + testType, whileCommandNode.test().location().orElse(Location.EMPTY)));
         }
         whileCommandNode.commands().nodes().forEach(x -> typeCheckCommand(x, scope, errors));
     }
@@ -586,20 +586,20 @@ public class TypeChecker {
     private static void handleForCommand(Scope scope, List<Error> errors, Node.ForCommandNode forCommandNode) {
         Node.IdNode identifier = forCommandNode.identifier();
         if (scope.variable(identifier.id()).isEmpty()) {
-            errors.add(new Error("For command with undeclared variable: " + identifier.id(), identifier.location()));
+            errors.add(new Error("For command with undeclared variable: " + identifier.id(), identifier.location().orElse(Location.EMPTY)));
         }
 
         Type startType = getType(forCommandNode.startValue(), scope, errors);
         Type endType = getType(forCommandNode.endValue(), scope, errors);
         Type stepType = getType(forCommandNode.step(), scope, errors);
         if (startType != PrimitiveTypes.INTEIRO) {
-            errors.add(new Error("For start command with non-integer types: " + startType, forCommandNode.startValue().location()));
+            errors.add(new Error("For start command with non-integer types: " + startType, forCommandNode.startValue().location().orElse(Location.EMPTY)));
         }
         if (endType != PrimitiveTypes.INTEIRO && endType != PrimitiveTypes.UNDEFINED) {
-            errors.add(new Error("For end command with non-integer types: " + endType, forCommandNode.endValue().location()));
+            errors.add(new Error("For end command with non-integer types: " + endType, forCommandNode.endValue().location().orElse(Location.EMPTY)));
         }
         if (stepType != PrimitiveTypes.INTEIRO && stepType != PrimitiveTypes.UNDECLARED) {
-            errors.add(new Error("For step command with non-integer types: " + stepType, forCommandNode.startValue().location()));
+            errors.add(new Error("For step command with non-integer types: " + stepType, forCommandNode.startValue().location().orElse(Location.EMPTY)));
         }
         forCommandNode.commands().nodes().forEach(x -> typeCheckCommand(x, scope, errors));
     }
@@ -609,20 +609,20 @@ public class TypeChecker {
         Type exprType = getType(assignmentNode.expr(), scope, errors);
 
         if (!areTypesCompatible(idType, exprType)) {
-            errors.add(new Error("Assignment of different types: " + idType + " and " + exprType, assignmentNode.expr().location()));
+            errors.add(new Error("Assignment of different types: " + idType + " and " + exprType, assignmentNode.expr().location().orElse(Location.EMPTY)));
         }
     }
 
     private static void handleIncrementNode(Scope scope, List<Error> errors, Node.IncrementNode incrementNode) {
         Type type = getType(incrementNode.expr(), scope, errors);
         if (type instanceof PrimitiveTypes) {
-            errors.add(new Error("Increment command on a primitive type: " + type, incrementNode.location()));
+            errors.add(new Error("Increment command on a primitive type: " + type, incrementNode.location().orElse(Location.EMPTY)));
         }
     }
 
     private static void handleDosNode(Scope scope, List<Error> errors, Node.DosNode dosNode) {
         if (scope.parent() != null) {
-            errors.add(new Error("Dos command inside a function or procedure", dosNode.location()));
+            errors.add(new Error("Dos command inside a function or procedure", dosNode.location().orElse(Location.EMPTY)));
         }
     }
 
@@ -644,24 +644,24 @@ public class TypeChecker {
 
     private static void handleInterrompaCommand(Scope scope, List<Error> errors, Node.InterrompaCommandNode interrompaCommandNode) {
         if (scope.parent() == null) {
-            errors.add(new Error("Interrompa command outside of a function or procedure", interrompaCommandNode.location()));
+            errors.add(new Error("Interrompa command outside of a function or procedure", interrompaCommandNode.location().orElse(Location.EMPTY)));
         }
     }
 
     private static Type getType(Node node, Scope scope, List<Error> errors) {
         return switch (node) {
-            case null -> Type.PrimitiveTypes.UNDEFINED;
-            case Node.TypeNode typeNode -> switch (typeNode.type().toLowerCase()) {
+            case Node.EmptyNode _ -> Type.PrimitiveTypes.UNDEFINED;
+            case Node.TypeNode(Node.StringLiteralNode(String stringValue, _), var location) -> switch (stringValue.toLowerCase()) {
                 case "inteiro" -> Type.PrimitiveTypes.INTEIRO;
                 case "real", "numerico" -> Type.PrimitiveTypes.REAL;
                 case "logico" -> Type.PrimitiveTypes.LOGICO;
                 case "caractere", "caracter", "literal" -> CARACTERE;
                 default -> {
-                    Optional<Declaration.UserDefinedType> type = scope.type(typeNode.type());
-                    if (type.isPresent()) {
-                        yield type.get();
+                    Optional<Declaration.UserDefinedType> userDefinedType = scope.type(stringValue);
+                    if (userDefinedType.isPresent()) {
+                        yield userDefinedType.get();
                     } else {
-                        errors.add(new Error("Type " + typeNode.type() + " not declared", typeNode.location()));
+                        errors.add(new Error("Type " + stringValue + " not declared", location.orElse(Location.EMPTY)));
                         yield Type.PrimitiveTypes.UNDECLARED;
                     }
                 }
@@ -680,17 +680,17 @@ public class TypeChecker {
                 if (idType instanceof Declaration.UserDefinedType userDefinedType) {
                     Node member = memberAccessNode.member();
                     if (!(member instanceof Node.IdNode idNode)) {
-                        errors.add(new Error("Member access with non-id node: " + member, member.location()));
+                        errors.add(new Error("Member access with non-id node: " + member, member.location().orElse(Location.EMPTY)));
                         yield Type.PrimitiveTypes.UNDECLARED;
                     }
                     Declaration.Variable variable = userDefinedType.variables().get(idNode.id().toLowerCase());
                     if (variable == null) {
-                        errors.add(new Error("Member " + member + " not declared in type " + userDefinedType.name(), member.location()));
+                        errors.add(new Error("Member " + member + " not declared in type " + userDefinedType.name(), member.location().orElse(Location.EMPTY)));
                         yield Type.PrimitiveTypes.UNDECLARED;
                     }
                     yield variable.type();
                 } else {
-                    errors.add(new Error("Member access on a non-user defined type: " + idType, memberAccessNode.location()));
+                    errors.add(new Error("Member access on a non-user defined type: " + idType, memberAccessNode.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -712,7 +712,7 @@ public class TypeChecker {
             case Node.IdNode idNode -> {
                 Optional<? extends Declaration> declaration = scope.declaration(idNode.id());
                 if (declaration.isEmpty()) {
-                    errors.add(new Error(idNode.id() + " not declared", idNode.location()));
+                    errors.add(new Error(idNode.id() + " not declared", idNode.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
                 yield getType(declaration.get());
@@ -725,21 +725,21 @@ public class TypeChecker {
                 if (exprType == Type.PrimitiveTypes.LOGICO) {
                     yield Type.PrimitiveTypes.LOGICO;
                 } else {
-                    errors.add(new Error("Not operation with non-boolean type: " + exprType, notNode.location()));
+                    errors.add(new Error("Not operation with non-boolean type: " + exprType, notNode.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
 
             case Node.ProcedureCallNode procedureCallNode -> {
                 if (scope.procedure(procedureCallNode.name().id()).isPresent()) {
-                    errors.add(new Error("Procedure " + procedureCallNode.name().id() + " does not return a value", procedureCallNode.location()));
+                    errors.add(new Error("Procedure " + procedureCallNode.name().id() + " does not return a value", procedureCallNode.location().orElse(Location.EMPTY)));
                 }
                 yield Type.PrimitiveTypes.UNDECLARED;
             }
             case Node.FunctionCallNode functionCallNode -> {
                 Optional<Declaration.Function> function = scope.function(functionCallNode.name().id());
                 if (function.isEmpty()) {
-                    errors.add(new Error("Function " + functionCallNode.name().id() + " not declared", functionCallNode.location()));
+                    errors.add(new Error("Function " + functionCallNode.name().id() + " not declared", functionCallNode.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
                 yield function.get().returnType();
@@ -747,7 +747,7 @@ public class TypeChecker {
 
             case Node.CompundNode _ -> null;
 
-            case Node.RangeNode(Node start, Node end, Location location) -> {
+            case Node.RangeNode(Node start, Node end, var location) -> {
                 Type startType = getType(start, scope, errors);
 
                 if (end == null) {
@@ -762,13 +762,12 @@ public class TypeChecker {
                         yield getGeneralNumberType(startType, endType);
                     }
                 } else {
-                    errors.add(new Error("Binary operation with non-primitive types: " + startType + " and " + endType, location));
+                    errors.add(new Error("Binary operation with non-primitive types: " + startType + " and " + endType, location.orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
-
             default -> {
-                errors.add(new Error("Unsupported type node: " + node.getClass(), node.location()));
+                errors.add(new Error("Unsupported type node: " + node.getClass(), node.location().orElse(Location.EMPTY)));
                 yield Type.PrimitiveTypes.UNDECLARED;
             }
 
@@ -795,7 +794,7 @@ public class TypeChecker {
                 } else if (areNumbers(leftType, rightType)) {
                     yield getGeneralNumberType(leftType, rightType);
                 } else {
-                    errors.add(new Error("Binary operation with non-primitive types: " + leftType + " and " + rightType, node.location()));
+                    errors.add(new Error("Binary operation with non-primitive types: " + leftType + " and " + rightType, node.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -806,7 +805,7 @@ public class TypeChecker {
                 if (areNumbers(leftType, rightType)) {
                     yield getGeneralNumberType(leftType, rightType);
                 } else {
-                    errors.add(new Error("Binary operation with non-primitive types: " + leftType + " and " + rightType, node.location()));
+                    errors.add(new Error("Binary operation with non-primitive types: " + leftType + " and " + rightType, node.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -816,7 +815,7 @@ public class TypeChecker {
                 if (areThey(Type.PrimitiveTypes.LOGICO, leftType, rightType)) {
                     yield Type.PrimitiveTypes.LOGICO;
                 } else {
-                    errors.add(new Error("Binary operation with non-boolean types: " + leftType + " and " + rightType, node.location()));
+                    errors.add(new Error("Binary operation with non-boolean types: " + leftType + " and " + rightType, node.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }
@@ -826,7 +825,7 @@ public class TypeChecker {
                 if (areTypesCompatible(leftType, rightType)) {
                     yield Type.PrimitiveTypes.LOGICO;
                 } else {
-                    errors.add(new Error("Binary operation with different types: " + leftType + " and " + rightType, node.location()));
+                    errors.add(new Error("Binary operation with different types: " + leftType + " and " + rightType, node.location().orElse(Location.EMPTY)));
                     yield Type.PrimitiveTypes.UNDECLARED;
                 }
             }

@@ -8,6 +8,9 @@ public record Location(
     int endLine,
     int endColumn
 ) {
+
+    public static final Location EMPTY = new Location(0, 0, 0, 0);
+
     public Location {
     }
 

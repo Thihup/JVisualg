@@ -11,27 +11,28 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
-    private static Location fromRuleContext(ParserRuleContext ctx) {
-        return new Location(
+    private static Optional<Location> fromRuleContext(ParserRuleContext ctx) {
+        return Optional.of(new Location(
                 ctx.start.getLine(),
                 ctx.start.getCharPositionInLine(),
                 ctx.stop.getLine(),
                 ctx.stop.getCharPositionInLine()
-        );
+        ));
     }
 
-    private static Location fromTerminalNode(TerminalNode ctx) {
-        return new Location(
+    private static Optional<Location> fromTerminalNode(TerminalNode ctx) {
+        return Optional.of(new Location(
                 ctx.getSymbol().getLine(),
                 ctx.getSymbol().getCharPositionInLine(),
                 ctx.getSymbol().getLine(),
                 ctx.getSymbol().getCharPositionInLine() + ctx.getSymbol().getText().length()
-        );
+        ));
     }
 
     @Override
@@ -94,7 +95,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         );
     }
 
-    private Collector<Node, ?, CompundNode> toCompundNode(Location location) {
+    private Collector<Node, ?, CompundNode> toCompundNode(Optional<Location> location) {
         return Collectors.collectingAndThen(Collectors.toUnmodifiableList(), node -> new CompundNode(node, location));
     }
 
@@ -153,7 +154,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     public Node visitType(VisuAlgParser.TypeContext ctx) {
         TerminalNode vetor = ctx.VETOR();
         if (vetor == null)
-            return new TypeNode(ctx.getText(), fromRuleContext(ctx));
+            return new TypeNode(new StringLiteralNode(ctx.getText(), fromRuleContext(ctx)), fromRuleContext(ctx));
         List<TerminalNode> range = ctx.RANGE();
 
 
@@ -180,8 +181,8 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
             max = null;
         }
 
-        return new AddNode(new SubNode(max != null ? new IntLiteralNode(max, null) : new IdNode(values[1], null),
-                min != null ? new IntLiteralNode(min, null) : new IdNode(values[0], null), null), new IntLiteralNode(1, null), null);
+        return new AddNode(new SubNode(max != null ? new IntLiteralNode(max, Optional.empty()) : new IdNode(values[1], Optional.empty()),
+                min != null ? new IntLiteralNode(min, Optional.empty()) : new IdNode(values[0], Optional.empty()), Optional.empty()), new IntLiteralNode(1, Optional.empty()), Optional.empty());
     }
 
     @Override
@@ -229,7 +230,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
             .reduce((result, element) -> switch (element) {
                 case ArrayAccessNode(_, CompundNode indexes, _) ->
                         new ArrayAccessNode(result, indexes, fromRuleContext(ctx));
-                case MemberAccessNode(_, Node expr, Location _) ->
+                case MemberAccessNode(_, Node expr, _) ->
                         new MemberAccessNode(result, expr, fromRuleContext(ctx));
                 case IdNode id -> new IdNode(id.id(), fromRuleContext(ctx));
                 default -> throw new IllegalStateException();
@@ -239,12 +240,12 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitMemberAccess(VisuAlgParser.MemberAccessContext ctx) {
-        return new MemberAccessNode(null, visit(ctx.idOrArray()), fromRuleContext(ctx));
+        return new MemberAccessNode(EmptyNode.INSTANCE, visit(ctx.idOrArray()), fromRuleContext(ctx));
     }
 
     @Override
     public Node visitArrayAccess(VisuAlgParser.ArrayAccessContext ctx) {
-        return new ArrayAccessNode(null, ctx.expr().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx))), fromRuleContext(ctx));
+        return new ArrayAccessNode(EmptyNode.INSTANCE, ctx.expr().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx))), fromRuleContext(ctx));
     }
 
     @Override
@@ -275,7 +276,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         boolean newLine = ctx.ESCREVAL() != null;
         VisuAlgParser.WriteListContext writeListContext = ctx.writeList();
         if (writeListContext == null) {
-            return new WriteCommandNode(newLine, new CompundNode(List.of(), fromRuleContext(ctx)), fromRuleContext(ctx));
+            return new WriteCommandNode(newLine, CompundNode.EMPTY, fromRuleContext(ctx));
         }
         CompundNode writeList = writeListContext.writeItem().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
         return new WriteCommandNode(newLine, writeList, fromRuleContext(ctx));
@@ -287,8 +288,9 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         Node expr = visit(ctx.expr());
         TerminalNode spaces = ctx.INT_LITERAL(0);
         TerminalNode precision = ctx.INT_LITERAL(1);
-        Integer spaces1 = spaces != null ? Integer.parseInt(spaces.getText()) : null;
-        Integer precision1 = precision != null ? Integer.parseInt(precision.getText()) : null;
+        Node spaces1 = spaces != null ? new IntLiteralNode(Integer.parseInt(spaces.getText()), fromTerminalNode(spaces)) : EmptyNode.INSTANCE;
+        Node precision1 = precision != null ? new IntLiteralNode(Integer.parseInt(precision.getText()), fromTerminalNode(precision)) : EmptyNode.INSTANCE;
+
         return new WriteItemNode(expr, spaces1, precision1, fromRuleContext(ctx));
     }
 
@@ -311,7 +313,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         Node expr = visit(ctx.expr());
         CompundNode cases = ctx.chooseCase().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
         VisuAlgParser.OutroCaseContext outroCaseContext = ctx.outroCase();
-        Node defaultCase = outroCaseContext != null ? visit(outroCaseContext) : null;
+        Node defaultCase = outroCaseContext != null ? visit(outroCaseContext) : EmptyNode.INSTANCE;
         return new ChooseCommandNode(expr, cases, defaultCase, fromRuleContext(ctx));
     }
 
@@ -325,7 +327,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     @Override
     public Node visitOutroCase(VisuAlgParser.OutroCaseContext ctx) {
         CompundNode commands = ctx.commands().command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
-        return new ChooseCaseNode(null, commands, fromRuleContext(ctx));
+        return new ChooseCaseNode(EmptyNode.INSTANCE, commands, fromRuleContext(ctx));
     }
 
     @Override
@@ -339,8 +341,8 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     @Override
     public Node visitParaCommand(VisuAlgParser.ParaCommandContext ctx) {
         IdNode idOrArray = new IdNode(ctx.ID().getText(), fromRuleContext(ctx));
-        Node endValue = ctx.expr(1) instanceof VisuAlgParser.ExprContext endValueExpr ? visit(endValueExpr) : null;
-        Node step = ctx.expr(2) instanceof VisuAlgParser.ExprContext stepValue ? visit(stepValue) : new IntLiteralNode(1, null);
+        Node endValue = ctx.expr(1) instanceof VisuAlgParser.ExprContext endValueExpr ? visit(endValueExpr) : EmptyNode.INSTANCE;
+        Node step = ctx.expr(2) instanceof VisuAlgParser.ExprContext stepValue ? visit(stepValue) : new IntLiteralNode(1, Optional.empty());
         CompundNode commands = ctx.commands().command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
 
 
@@ -444,7 +446,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitArquivoCommand(VisuAlgParser.ArquivoCommandContext ctx) {
-        return new ArquivoCommandNode(ctx.STRING().getText(), fromRuleContext(ctx));
+        return new ArquivoCommandNode(new StringLiteralNode(ctx.STRING().getText(), fromTerminalNode(ctx.STRING())), fromRuleContext(ctx));
     }
 
 
