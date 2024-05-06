@@ -43,7 +43,12 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitDeclarations(VisuAlgParser.DeclarationsContext ctx) {
-        return new CompundNode(ctx.children.stream().map(this::visit).filter(Objects::nonNull).toList(), fromRuleContext(ctx));
+        List<Node> list = ctx.children.stream()
+            .map(this::visit)
+            .filter(Objects::nonNull)
+            .sorted(Comparator.comparing(x -> x instanceof SubprogramDeclarationNode))
+            .toList();
+        return new CompundNode(list, fromRuleContext(ctx));
     }
 
 

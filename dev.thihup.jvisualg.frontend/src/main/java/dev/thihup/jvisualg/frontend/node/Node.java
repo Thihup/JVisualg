@@ -141,7 +141,10 @@ public sealed interface Node {
         }
     }
 
-    record FunctionDeclarationNode(IdNode name, Node returnType, CompundNode parameters, CompundNode references, CompundNode declarations,CompundNode commands, Optional<Location> location) implements Node {
+    sealed interface SubprogramDeclarationNode extends Node {
+    }
+
+    record FunctionDeclarationNode(IdNode name, Node returnType, CompundNode parameters, CompundNode references, CompundNode declarations,CompundNode commands, Optional<Location> location) implements SubprogramDeclarationNode {
         public FunctionDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(returnType);
@@ -153,7 +156,7 @@ public sealed interface Node {
         }
     }
 
-    record ProcedureDeclarationNode(IdNode name, CompundNode parameters, CompundNode references, CompundNode declarations, CompundNode commands, Optional<Location> location) implements Node {
+    record ProcedureDeclarationNode(IdNode name, CompundNode parameters, CompundNode references, CompundNode declarations, CompundNode commands, Optional<Location> location) implements SubprogramDeclarationNode {
         public ProcedureDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(parameters);
