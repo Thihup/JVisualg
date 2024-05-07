@@ -1,9 +1,15 @@
-.text0 {
-    -fx-fill: #000000;
+#codeArea {
+    -fx-font-family: "Courier New";
+    -fx-font-size: 10pt;
 }
 
-.background0 {
-    -fx-background-color: #FFFFFF;
+.error {
+    -rtfx-background-color: #f0f0f0;
+    -rtfx-underline-color: red;
+    -rtfx-underline-dash-array: 2 2;
+    -rtfx-underline-width: 1;
+    -rtfx-underline-cap: butt;
+    -fx-fill: red;
 }
 
 .italic {
@@ -25,7 +31,6 @@
 .string {
     -fx-fill: #FF0000;
 }
-
 
 .keyword {
     -fx-fill: #0000FF;

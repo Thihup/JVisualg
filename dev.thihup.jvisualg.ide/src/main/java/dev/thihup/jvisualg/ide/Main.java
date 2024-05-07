@@ -1,36 +1,57 @@
 package dev.thihup.jvisualg.ide;
 
+import dev.thihup.jvisualg.lsp.VisualgLauncher;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Point2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.stage.Popup;
 import javafx.stage.Stage;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.launch.LSPLauncher;
+import org.eclipse.lsp4j.services.LanguageClient;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.event.MouseOverTextEvent;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.reactfx.Subscription;
 
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Main extends Application {
 
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor = Executors.newFixedThreadPool(3);
 
     @FXML
     private CodeArea codeArea;
 
     private Subscription subscribe;
+    private Launcher<LanguageServer> clientLauncher;
+    private Future<Void> lspServer;
+    private Future<Void> lspClient;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -77,25 +98,131 @@ public class Main extends Application {
         stage.setScene(scene);
         stage.show();
 
+
+        PipedInputStream inClient = new PipedInputStream();
+        PipedOutputStream outClient = new PipedOutputStream();
+        PipedInputStream inServer = new PipedInputStream();
+        PipedOutputStream outServer = new PipedOutputStream();
+
+        inClient.connect(outServer);
+        outClient.connect(inServer);
+
+        lspServer = VisualgLauncher.startServer(inServer, outServer, executor);
+        clientLauncher = LSPLauncher.createClientLauncher(new VisualgLanguageClient(), inClient, outClient, executor, null);
+
+        lspClient = clientLauncher.startListening();
+
+        Popup popup = new Popup();
+        Label popupMsg = new Label();
+        popupMsg.setStyle(
+                "-fx-background-color: black;" +
+                        "-fx-text-fill: white;" +
+                        "-fx-padding: 5;");
+        popup.getContent().add(popupMsg);
+
+        codeArea.setMouseOverTextDelay(Duration.ofMillis(200));
+        codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_BEGIN, e -> {
+            int chIdx = e.getCharacterIndex();
+            Point2D pos = e.getScreenPosition();
+            if (codeArea.getText().isEmpty() || diagnostics == null)
+                return;
+            diagnostics.stream()
+                    .filter(diagnostic -> {
+                        int start = toOffset(codeArea.getText(), diagnostic.getRange().getStart());
+                        int end = toOffset(codeArea.getText(), diagnostic.getRange().getEnd());
+                        return chIdx >= start && chIdx <= end;
+                    })
+                    .findFirst().ifPresent(diagnostic -> {
+                        popupMsg.setText(diagnostic.getMessage());
+                        popup.show(codeArea, pos.getX(), pos.getY() + 10);
+                    });
+
+        });
+        codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_END, e -> {
+            popup.hide();
+        });
+
+
         if (Boolean.getBoolean("autoClose"))
             Platform.runLater(stage::close);
     }
 
+
+    private List<Diagnostic> diagnostics;
+
+    class VisualgLanguageClient implements LanguageClient {
+
+
+        @Override
+        public void telemetryEvent(Object object) {
+
+        }
+
+        @Override
+        public void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
+            Main.this.diagnostics = diagnostics.getDiagnostics();
+            diagnostics.getDiagnostics().forEach(diagnostic -> {
+                System.out.println(diagnostic.getMessage());
+                Platform.runLater(() -> {
+                    if (codeArea.getText().isEmpty())
+                        return;
+                    int offsetStart = toOffset(codeArea.getText(), diagnostic.getRange().getStart());
+                    int offsetEnd = toOffset(codeArea.getText(), diagnostic.getRange().getEnd()) + 1;
+                    codeArea.setStyleClass(offsetStart, offsetEnd, "error");
+                });
+
+            });
+        }
+
+        @Override
+        public void showMessage(MessageParams messageParams) {
+
+        }
+
+        @Override
+        public CompletableFuture<MessageActionItem> showMessageRequest(ShowMessageRequestParams requestParams) {
+            return null;
+        }
+
+        @Override
+        public void logMessage(MessageParams message) {
+            System.out.println(message.getMessage());
+        }
+    }
 
     @Override
     public void stop() throws Exception {
         if (subscribe != null) {
             subscribe.unsubscribe();
         }
+        if (lspServer != null) {
+            lspServer.cancel(true);
+        }
+        if (lspClient != null) {
+            lspClient.cancel(true);
+        }
         executor.shutdown();
     }
+
+    private int toOffset(String text, Position position) {
+        String[] lines = text.split("\n");
+        int offset = 0;
+        for (int i = 0; i < lines.length; i++) {
+            if (i == position.getLine()) {
+                return offset + position.getCharacter();
+            }
+            offset += lines[i].length() + 1;
+        }
+        return 0;
+    }
+
 
     public static void main(String[] args) {
         launch(args);
     }
 
     private static final List<String> KEYWORDS = List.of(
-            "Div", "Mod", "Se", "Entao", "Então", "Senao", "Senão", "FimSe", "Para", "De", "Ate", "Até", "Passo", "FimPara", "Faca", "Faça", "Enquanto", "FimEnquanto",  "Retorne", "E", "Ou", "Nao", "Não",   "Escolha", "FimEscolha", "Repita", "FimRepita", "Caso", "OutroCaso",
+            "Div", "Mod", "Se", "Entao", "Então", "Senao", "Senão", "FimSe", "Para", "De", "Ate", "Até", "Passo", "FimPara", "Faca", "Faça", "Enquanto", "FimEnquanto", "Retorne", "E", "Ou", "Nao", "Não", "Escolha", "FimEscolha", "Repita", "FimRepita", "Caso", "OutroCaso",
             "abs", "arccos", "arcsen", "arctan", "asc", "carac", "caracpnum", "compr", "copia", "cos", "cotan", "exp", "grauprad", "int", "log", "logn", "maiusc", "minusc", "numpcarac", "pos", "pi", "quad", "radpgrau", "raizq", "rand", "randi"
 
     );
@@ -105,7 +232,7 @@ public class Main extends Application {
     );
 
     private static final List<String> SPECIAL_KEYWORDS = List.of(
-            "Escreva", "Escreval", "Leia", "Algoritmo", "FimAlgoritmo", "Funcao", "Função", "FimFuncao", "FimFunção", "Procedimento", "FimProcedimento","Inicio", "Var"
+            "Escreva", "Escreval", "Leia", "Algoritmo", "FimAlgoritmo", "Funcao", "Função", "FimFuncao", "FimFunção", "Procedimento", "FimProcedimento", "Inicio", "Var"
     );
 
 
@@ -119,17 +246,22 @@ public class Main extends Application {
     private static final Pattern PATTERN = Pattern.compile(
 
             "(?<KEYWORD>" + KEYWORD_PATTERN + ")"
-            + "|(?<STRING>" + STRING_PATTERN + ")"
-            + "|(?<COMMENT>" + COMMENT_PATTERN + ")"
-            + "|(?<NUMBER>" + NUMBER_PATTERN + ")"
-            + "|(?<TYPE>" + TYPES_PATTERN + ")"
-            + "|(?<SPECIAL>" + SPECIAL_PATTERN + ")");
+                    + "|(?<STRING>" + STRING_PATTERN + ")"
+                    + "|(?<COMMENT>" + COMMENT_PATTERN + ")"
+                    + "|(?<NUMBER>" + NUMBER_PATTERN + ")"
+                    + "|(?<TYPE>" + TYPES_PATTERN + ")"
+                    + "|(?<SPECIAL>" + SPECIAL_PATTERN + ")");
+
+    private final LongAdder counter = new LongAdder();
 
     private Task<StyleSpans<Collection<String>>> computeHighlightingAsync() {
         String text = codeArea.getText();
         Task<StyleSpans<Collection<String>>> task = new Task<>() {
             @Override
             protected StyleSpans<Collection<String>> call() throws Exception {
+                VersionedTextDocumentIdentifier versionedTextDocumentIdentifier = new VersionedTextDocumentIdentifier("untitled://file", counter.intValue());
+                DidChangeTextDocumentParams didChangeTextDocumentParams = new DidChangeTextDocumentParams(versionedTextDocumentIdentifier, Collections.singletonList(new TextDocumentContentChangeEvent(text)));
+                clientLauncher.getRemoteProxy().getTextDocumentService().didChange(didChangeTextDocumentParams);
                 return computeHighlighting(text);
             }
         };
@@ -145,7 +277,7 @@ public class Main extends Application {
         Matcher matcher = PATTERN.matcher(text);
         int lastKwEnd = 0;
         StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
-        while(matcher.find()) {
+        while (matcher.find()) {
             List<String> style = switch (matcher) {
 
                 case Matcher _ when matcher.group("KEYWORD") != null -> List.of("keyword");
