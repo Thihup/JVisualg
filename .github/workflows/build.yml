@@ -1,0 +1,34 @@
+name: GraalVM build
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '22'
+          distribution: 'graalvm'
+          cache: 'maven'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Example step
+        run: |
+          echo "GRAALVM_HOME: $GRAALVM_HOME"
+          echo "JAVA_HOME: $JAVA_HOME"
+          java --version
+          native-image --version
+      - name: Compile and package
+        run: mvn package
+      - name: Example step using Maven plugin
+        run: |
+          cd dev.thihup.jvisualg.ide
+          mvn -Pnative -Dagent exec:exec@java-agent
+          mvn -Pnative package
+      - name: Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "dev.thihup.jvisualg.ide/target/JVisualG.exe"
+          replacesArtifacts: true
+          tag: JVisualg
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true

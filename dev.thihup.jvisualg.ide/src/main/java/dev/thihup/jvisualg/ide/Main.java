@@ -1,6 +1,7 @@
 package dev.thihup.jvisualg.ide;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -75,6 +76,9 @@ public class Main extends Application {
         stage.setTitle("JVisualG");
         stage.setScene(scene);
         stage.show();
+
+        if (Boolean.getBoolean("autoClose"))
+            Platform.runLater(stage::close);
     }
 
 

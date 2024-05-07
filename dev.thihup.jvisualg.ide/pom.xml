@@ -12,21 +12,22 @@
     <artifactId>dev.thihup.jvisualg.ide</artifactId>
 
     <properties>
-        <maven.compiler.source>22</maven.compiler.source>
-        <maven.compiler.target>22</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <mainClass>dev.thihup.jvisualg.ide.Main</mainClass>
+        <native.maven.plugin.version>0.9.12</native.maven.plugin.version>
+        <imageName>JVisualG</imageName>
+        <javafx.version>22</javafx.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>22</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>22</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.fxmisc.richtext</groupId>
@@ -34,5 +35,103 @@
             <version>0.11.2</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>java-agent</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>java</executable>
+                            <workingDirectory>${project.build.directory}</workingDirectory>
+                            <arguments>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.scene.layout=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.util=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.application=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.scene.text=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.base/com.sun.javafx.event=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.base/com.sun.javafx.collections=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.base/com.sun.javafx.binding=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.base/com.sun.javafx=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.scene.traversal=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.base/com.sun.javafx.logging=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.geom=ALL-UNNAMED</argument>
+                                <argument>--add-exports=javafx.graphics/com.sun.javafx.scene.input=ALL-UNNAMED</argument>
+                                <argument>-p</argument>
+                                <modulepath/>
+                                <argument>-cp</argument>
+                                <classpath/>
+                                <argument>-DautoClose=true</argument>
+                                <argument>-m</argument>
+                                <argument>dev.thihup.jvisualg.ide/${mainClass}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>native</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${project.build.directory}/${imageName}</executable>
+                            <workingDirectory>${project.build.directory}</workingDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>${native.maven.plugin.version}</version>
+                        <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                            <execution>
+                                <id>test-native</id>
+                                <goals>
+                                    <goal>test</goal>
+                                </goals>
+                                <phase>test</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <fallback>false</fallback>
+                            <imageName>${imageName}</imageName>
+                            <agent>
+                                <enabled>true</enabled>
+                                <options>
+                                    <option>experimental-class-loader-support</option>
+                                </options>
+                            </agent>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>
