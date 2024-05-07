@@ -1,0 +1,43 @@
+name: GraalVM build
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '22'
+          distribution: 'graalvm'
+          cache: 'maven'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Setup the Windows build environment
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Visual Studio shell
+        uses: egor-tensin/vs-shell@v2
+
+
+      - name: Example step
+        run: |
+          echo "GRAALVM_HOME: $GRAALVM_HOME"
+          echo "JAVA_HOME: $JAVA_HOME"
+          java --version
+          native-image --version
+      - name: Compile and package
+        run: mvn --no-transfer-progress package
+      - name: Example step using Maven plugin
+        run: |
+          cd dev.thihup.jvisualg.ide
+          mvn --no-transfer-progress -Pnative gluonfx:runagent
+          mvn --no-transfer-progress -Pnative gluonfx:build
+      - name: Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "dev.thihup.jvisualg.ide/target/gluonfx/x86_64-windows/JVisualG.exe"
+          replacesArtifacts: true
+          tag: JVisualg
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
