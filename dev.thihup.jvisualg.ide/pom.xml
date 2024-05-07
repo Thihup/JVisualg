@@ -22,6 +22,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>dev.thihup.jvisualg</groupId>
+            <artifactId>dev.thihup.jvisualg.lsp</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
