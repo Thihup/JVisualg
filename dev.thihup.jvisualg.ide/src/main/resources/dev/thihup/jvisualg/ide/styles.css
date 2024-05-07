@@ -1,0 +1,40 @@
+.text0 {
+    -fx-fill: #000000;
+}
+
+.background0 {
+    -fx-background-color: #FFFFFF;
+}
+
+.italic {
+    -fx-font-style: italic;
+}
+
+.underline {
+    -fx-underline: true
+}
+
+.comment {
+    -fx-fill: #008000;
+}
+
+.number {
+    -fx-fill: #FF0000;
+}
+
+.string {
+    -fx-fill: #FF0000;
+}
+
+
+.keyword {
+    -fx-fill: #0000FF;
+}
+
+.special {
+    -fx-fill: #021691;
+}
+
+.dataType {
+    -fx-fill: #8b0000;
+}

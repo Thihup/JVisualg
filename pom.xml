@@ -12,6 +12,7 @@
         <module>dev.thihup.jvisualg.frontend</module>
         <module>dev.thihup.jvisualg.backend</module>
         <module>dev.thihup.jvisualg.lsp</module>
+        <module>dev.thihup.jvisualg.ide</module>
     </modules>
 
     <properties>
