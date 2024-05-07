@@ -27,7 +27,7 @@ jobs:
           java --version
           native-image --version
       - name: Compile and package
-        run: mvn --no-transfer-progress package
+        run: mvn --no-transfer-progress install
       - name: Example step using Maven plugin
         run: |
           cd dev.thihup.jvisualg.ide
