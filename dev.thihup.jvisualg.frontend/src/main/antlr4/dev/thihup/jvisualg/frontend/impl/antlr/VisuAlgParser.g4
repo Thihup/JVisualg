@@ -86,7 +86,7 @@ readCommand : LEIA LPAREN exprList RPAREN;
 // Write command
 writeCommand : (ESCREVA | ESCREVAL) (LPAREN writeList? RPAREN)?;
 writeList : writeItem (COMMA writeItem)*;
-writeItem : expr (COLON INT_LITERAL (COLON INT_LITERAL)?)?;
+writeItem : expr (COLON expr (COLON expr)?)?;
 
 // Conditional commands
 conditionalCommand : SE expr ENTAO commands FIMSE

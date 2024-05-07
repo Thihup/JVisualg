@@ -199,7 +199,10 @@ public sealed interface Node {
         }
     }
 
-    sealed interface LiteralNode extends Node {
+    sealed interface ExpressionNode extends Node {
+    }
+
+    sealed interface LiteralNode extends ExpressionNode {
     }
 
     record BooleanLiteralNode(boolean value, Optional<Location> location) implements LiteralNode {
@@ -269,7 +272,7 @@ public sealed interface Node {
         }
     }
 
-    record IdNode(String id, Optional<Location> location) implements Node {
+    record IdNode(String id, Optional<Location> location) implements ExpressionNode {
         public IdNode {
             Objects.requireNonNull(id);
             Objects.requireNonNull(location);
@@ -376,7 +379,7 @@ public sealed interface Node {
         }
     }
 
-    record FunctionCallNode(IdNode name, CompundNode args, Optional<Location> location) implements CommandNode {
+    record FunctionCallNode(IdNode name, CompundNode args, Optional<Location> location) implements CommandNode, ExpressionNode {
         public FunctionCallNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(args);
@@ -384,7 +387,7 @@ public sealed interface Node {
         }
     }
 
-    sealed interface BinaryNode extends CommandNode {
+    sealed interface BinaryNode extends CommandNode, ExpressionNode {
         Node left();
 
         Node right();
@@ -438,7 +441,7 @@ public sealed interface Node {
         }
     }
 
-    sealed interface BooleanNode extends CommandNode {}
+    sealed interface BooleanNode extends CommandNode, ExpressionNode {}
 
     record AndNode(Node left, Node right, Optional<Location> location) implements BooleanNode, BinaryNode {
         public AndNode {

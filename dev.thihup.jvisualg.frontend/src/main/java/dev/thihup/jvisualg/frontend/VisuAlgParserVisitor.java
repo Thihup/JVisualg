@@ -139,7 +139,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         }
         TerminalNode string = ctx.STRING();
         if (string != null) {
-            return new StringLiteralNode(string.getText(), fromTerminalNode(string));
+            return new StringLiteralNode(string.getText().substring(1, string.getText().length() - 1), fromTerminalNode(string));
         }
         TerminalNode real = ctx.REAL_LITERAL();
         if (real != null) {
@@ -147,7 +147,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         }
         TerminalNode inteiro = ctx.INT_LITERAL();
         if (inteiro != null) {
-            return new IntLiteralNode(Integer.parseInt(inteiro.getText()), fromTerminalNode(inteiro));
+            return new RealLiteralNode(Integer.parseInt(inteiro.getText()), fromTerminalNode(inteiro));
         }
         throw new RuntimeException("Unknown literal: " + ctx.getText());
     }
@@ -288,13 +288,11 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitWriteItem(VisuAlgParser.WriteItemContext ctx) {
-        Node expr = visit(ctx.expr());
-        TerminalNode spaces = ctx.INT_LITERAL(0);
-        TerminalNode precision = ctx.INT_LITERAL(1);
-        Node spaces1 = spaces != null ? new IntLiteralNode(Integer.parseInt(spaces.getText()), fromTerminalNode(spaces)) : EmptyNode.INSTANCE;
-        Node precision1 = precision != null ? new IntLiteralNode(Integer.parseInt(precision.getText()), fromTerminalNode(precision)) : EmptyNode.INSTANCE;
+        Node expr = visit(ctx.expr(0));
+        Node spaces = ctx.expr(1) != null ? visit(ctx.expr(1)) : EmptyNode.INSTANCE;
+        Node precision = ctx.expr(2) != null ? visit(ctx.expr(2)) : EmptyNode.INSTANCE;
 
-        return new WriteItemNode(expr, spaces1, precision1, fromRuleContext(ctx));
+        return new WriteItemNode(expr, spaces, precision, fromRuleContext(ctx));
     }
 
 
