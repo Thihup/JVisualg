@@ -1,13 +1,10 @@
 package dev.thihup.jvisualg.frontend;
 
-import dev.thihup.jvisualg.frontend.node.Node;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 class MainTest {

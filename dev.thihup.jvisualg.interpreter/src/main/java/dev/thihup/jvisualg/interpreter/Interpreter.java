@@ -1,10 +1,7 @@
 package dev.thihup.jvisualg.interpreter;
 
-import dev.thihup.jvisualg.frontend.ASTResult;
-import dev.thihup.jvisualg.frontend.Main;
 import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
-import org.antlr.v4.runtime.misc.Pair;
 
 import java.io.*;
 import java.math.RoundingMode;

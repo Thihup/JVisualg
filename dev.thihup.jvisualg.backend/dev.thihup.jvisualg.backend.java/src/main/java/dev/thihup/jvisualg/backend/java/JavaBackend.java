@@ -1,6 +1,5 @@
 package dev.thihup.jvisualg.backend.java;
 
-import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
 
 import java.util.List;

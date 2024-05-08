@@ -1,7 +1,5 @@
 package dev.thihup.jvisualg.frontend.node;
 
-import org.antlr.v4.runtime.ParserRuleContext;
-
 public record Location(
     int startLine,
     int startColumn,

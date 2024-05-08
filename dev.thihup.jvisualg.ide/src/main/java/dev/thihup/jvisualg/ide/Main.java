@@ -19,8 +19,6 @@ import javafx.stage.Stage;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.OutputEventArguments;
-import org.eclipse.lsp4j.debug.SetBreakpointsArguments;
-import org.eclipse.lsp4j.debug.SourceBreakpoint;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;

@@ -2,11 +2,9 @@ package dev.thihup.jvisualg.interpreter;
 
 import dev.thihup.jvisualg.frontend.Main;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 import java.io.*;
-import java.math.RoundingMode;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -14,7 +12,7 @@ class InterpreterTest {
     @Test
     void test() {
         StringWriter stringWriter = new StringWriter();
-        new Interpreter(Reader.nullReader(), stringWriter)
+        new Interpreter(Reader.nullReader(), stringWriter, new ReentrantLock())
             .run(Main.buildAST(new ByteArrayInputStream("""
                 algoritmo "Teste"
                 var
@@ -443,7 +441,7 @@ class InterpreterTest {
             }
         };
 
-        new Interpreter(stringReader, stringWriter)
+        new Interpreter(stringReader, stringWriter, new ReentrantLock())
                 .run(Main.buildAST(new ByteArrayInputStream("""
                 algoritmo "Teste"
                 var

@@ -4,7 +4,6 @@ import dev.thihup.jvisualg.frontend.ASTResult;
 import dev.thihup.jvisualg.frontend.Main;
 import dev.thihup.jvisualg.frontend.node.Location;
 import org.eclipse.lsp4j.debug.*;
-import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 
 import java.io.*;
