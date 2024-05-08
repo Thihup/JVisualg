@@ -1,5 +1,7 @@
 package dev.thihup.jvisualg.ide;
 
+import dev.thihup.jvisualg.interpreter.DAPServer;
+import dev.thihup.jvisualg.interpreter.DebugProtocolClientExtension;
 import dev.thihup.jvisualg.lsp.VisualgLauncher;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -9,11 +11,20 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.debug.InitializeRequestArguments;
+import org.eclipse.lsp4j.debug.OutputEventArguments;
+import org.eclipse.lsp4j.debug.SetBreakpointsArguments;
+import org.eclipse.lsp4j.debug.SourceBreakpoint;
+import org.eclipse.lsp4j.debug.launch.DSPLauncher;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.debug.DebugLauncher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -24,15 +35,13 @@ import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.reactfx.Subscription;
 
+import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,41 +52,81 @@ import java.util.regex.Pattern;
 
 public class Main extends Application {
 
-    private final ExecutorService executor = Executors.newFixedThreadPool(3);
+    private final ExecutorService fxClientExecutor = Executors.newSingleThreadExecutor();
+
+    private final ExecutorService lspClientExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService lspServerExecutor = Executors.newSingleThreadExecutor();
+
+    private final ExecutorService dapClientExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService dapServerExecutor = Executors.newSingleThreadExecutor();
+
 
     @FXML
     private CodeArea codeArea;
+
+    @FXML
+    private Button runButton;
+
+    @FXML
+    private TextArea outputArea;
 
     private Subscription subscribe;
     private Launcher<LanguageServer> clientLauncher;
     private Future<Void> lspServer;
     private Future<Void> lspClient;
+    private Launcher<DebugProtocolClientExtension> dapServerLauncher;
+    private Launcher<IDebugProtocolServer> dapClientLauncher;
+    private Future<Void> dapServerListener;
+    private Future<Void> dapClientListener;
+    private List<Diagnostic> diagnostics;
 
     @Override
     public void start(Stage stage) throws Exception {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("gui.fxml"));
         fxmlLoader.setController(this);
-
         Parent root = fxmlLoader.load();
 
         codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
 
-        subscribe = codeArea.multiPlainChanges()
-                .successionEnds(Duration.ofMillis(50))
-                .retainLatestUntilLater(executor)
-                .supplyTask(this::computeHighlightingAsync)
-                .awaitLatest(codeArea.multiPlainChanges())
-                .filterMap(t -> {
-                    if (t.isSuccess()) {
-                        return Optional.of(t.get());
-                    } else {
-                        t.getFailure().printStackTrace();
-                        return Optional.empty();
-                    }
-                })
-                .subscribe(this::applyHighlighting);
+        setupSyntaxHighlighting();
+
+        setupDefaultText();
+
+        showScene(stage, root);
+
+        setupLSP();
+
+        setupDAP();
+
+        runButton.addEventHandler(javafx.event.ActionEvent.ACTION, e -> {
+            Platform.runLater(() -> {
+                outputArea.clear();
+                dapClientLauncher.getRemoteProxy().launch(Map.of("source", codeArea.getText()));
+            });
+        });
 
 
+        setupErrorPopup();
+
+        if (Boolean.getBoolean("autoClose"))
+            Platform.runLater(stage::close);
+    }
+
+    private void showScene(Stage stage, Parent root) {
+        Scene scene = new Scene(root);
+        scene.setOnKeyPressed(x -> {
+            switch (x.getCode()) {
+                case F9 -> runButton.fire();
+                default -> {}
+            }
+        });
+        scene.getStylesheets().add(getClass().getResource("styles.css").toExternalForm());
+        stage.setTitle("JVisualG");
+        stage.setScene(scene);
+        stage.show();
+    }
+
+    private void setupDefaultText() {
         codeArea.replaceText(0, 0, """
                 algoritmo "semnome"
                 // Função :
@@ -90,28 +139,61 @@ public class Main extends Application {
                 // Seção de Comandos
                 fimalgoritmo
                 """.formatted(LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+    }
 
+    private void setupSyntaxHighlighting() {
+        subscribe = codeArea.multiPlainChanges()
+                .successionEnds(Duration.ofMillis(50))
+                .retainLatestUntilLater(fxClientExecutor)
+                .supplyTask(this::computeHighlightingAsync)
+                .awaitLatest(codeArea.multiPlainChanges())
+                .filterMap(t -> {
+                    if (t.isSuccess()) {
+                        return Optional.of(t.get());
+                    } else {
+                        t.getFailure().printStackTrace();
+                        return Optional.empty();
+                    }
+                })
+                .subscribe(this::applyHighlighting);
+    }
 
-        Scene scene = new Scene(root);
-        scene.getStylesheets().add(getClass().getResource("styles.css").toExternalForm());
-        stage.setTitle("JVisualG");
-        stage.setScene(scene);
-        stage.show();
+    private void setupLSP() throws IOException {
+        PipedInputStream lspInputClient = new PipedInputStream();
+        PipedOutputStream lspOutputClient = new PipedOutputStream();
+        PipedInputStream lspInputServer = new PipedInputStream();
+        PipedOutputStream lspOutputServer = new PipedOutputStream();
 
+        lspInputClient.connect(lspOutputServer);
+        lspOutputClient.connect(lspInputServer);
 
-        PipedInputStream inClient = new PipedInputStream();
-        PipedOutputStream outClient = new PipedOutputStream();
-        PipedInputStream inServer = new PipedInputStream();
-        PipedOutputStream outServer = new PipedOutputStream();
-
-        inClient.connect(outServer);
-        outClient.connect(inServer);
-
-        lspServer = VisualgLauncher.startServer(inServer, outServer, executor);
-        clientLauncher = LSPLauncher.createClientLauncher(new VisualgLanguageClient(), inClient, outClient, executor, null);
+        lspServer = VisualgLauncher.startServer(lspInputServer, lspOutputServer, lspServerExecutor);
+        clientLauncher = LSPLauncher.createClientLauncher(new VisualgLanguageClient(), lspInputClient, lspOutputClient, lspClientExecutor, null);
 
         lspClient = clientLauncher.startListening();
+    }
 
+    private void setupDAP() throws IOException {
+        PipedInputStream dapInputClient = new PipedInputStream();
+        PipedOutputStream dapOutputClient = new PipedOutputStream();
+        PipedInputStream dapInputServer  = new PipedInputStream();
+        PipedOutputStream dapOutputServer = new PipedOutputStream();
+
+        dapInputClient.connect(dapOutputServer);
+        dapOutputClient.connect(dapInputServer);
+
+        DAPServer server = new DAPServer();
+        dapServerLauncher = DebugLauncher.createLauncher(server, DebugProtocolClientExtension.class, dapInputServer, dapOutputServer, dapServerExecutor, null);
+        server.connect(dapServerLauncher.getRemoteProxy());
+        dapServerListener = dapServerLauncher.startListening();
+
+
+        dapClientLauncher = DSPLauncher.createClientLauncher(new DAPClient(), dapInputClient, dapOutputClient, dapClientExecutor, null);
+        dapClientListener = dapClientLauncher.startListening();
+        dapClientLauncher.getRemoteProxy().initialize(new InitializeRequestArguments());
+    }
+
+    private void setupErrorPopup() {
         Popup popup = new Popup();
         Label popupMsg = new Label();
         popupMsg.setStyle(
@@ -122,33 +204,30 @@ public class Main extends Application {
 
         codeArea.setMouseOverTextDelay(Duration.ofMillis(200));
         codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_BEGIN, e -> {
-            int chIdx = e.getCharacterIndex();
-            Point2D pos = e.getScreenPosition();
-            if (codeArea.getText().isEmpty() || diagnostics == null)
-                return;
-            diagnostics.stream()
-                    .filter(diagnostic -> {
-                        int start = toOffset(codeArea.getText(), diagnostic.getRange().getStart());
-                        int end = toOffset(codeArea.getText(), diagnostic.getRange().getEnd());
-                        return chIdx >= start && chIdx <= end;
-                    })
-                    .findFirst().ifPresent(diagnostic -> {
-                        popupMsg.setText(diagnostic.getMessage());
-                        popup.show(codeArea, pos.getX(), pos.getY() + 10);
-                    });
-
+            handlePopupError(e, popupMsg, popup);
         });
         codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_END, e -> {
             popup.hide();
         });
-
-
-        if (Boolean.getBoolean("autoClose"))
-            Platform.runLater(stage::close);
     }
 
+    private void handlePopupError(MouseOverTextEvent e, Label popupMsg, Popup popup) {
+        int chIdx = e.getCharacterIndex();
+        Point2D pos = e.getScreenPosition();
+        if (codeArea.getText().isEmpty() || diagnostics == null)
+            return;
+        diagnostics.stream()
+                .filter(diagnostic -> {
+                    int start = toOffset(codeArea.getText(), diagnostic.getRange().getStart());
+                    int end = toOffset(codeArea.getText(), diagnostic.getRange().getEnd());
+                    return chIdx >= start && chIdx <= end;
+                })
+                .findFirst().ifPresent(diagnostic -> {
+                    popupMsg.setText(diagnostic.getMessage());
+                    popup.show(codeArea, pos.getX(), pos.getY() + 10);
+                });
+    }
 
-    private List<Diagnostic> diagnostics;
 
     class VisualgLanguageClient implements LanguageClient {
 
@@ -195,13 +274,24 @@ public class Main extends Application {
         if (subscribe != null) {
             subscribe.unsubscribe();
         }
-        if (lspServer != null) {
-            lspServer.cancel(true);
-        }
         if (lspClient != null) {
             lspClient.cancel(true);
         }
-        executor.shutdown();
+        if (lspServer != null) {
+            lspServer.cancel(true);
+        }
+        if (dapClientListener != null) {
+            dapClientListener.cancel(true);
+        }
+        if (dapServerListener != null) {
+            dapServerListener.cancel(true);
+        }
+
+        fxClientExecutor.shutdown();
+        lspClientExecutor.shutdown();
+        dapClientExecutor.shutdown();
+        lspServerExecutor.shutdown();
+        dapServerExecutor.shutdown();
     }
 
     private int toOffset(String text, Position position) {
@@ -265,7 +355,7 @@ public class Main extends Application {
                 return computeHighlighting(text);
             }
         };
-        executor.execute(task);
+        fxClientExecutor.execute(task);
         return task;
     }
 
@@ -298,4 +388,15 @@ public class Main extends Application {
         return spansBuilder.create();
     }
 
+    private class DAPClient implements DebugProtocolClientExtension {
+        @Override
+        public void output(OutputEventArguments args) {
+            Platform.runLater(() -> outputArea.appendText(args.getOutput()));
+        }
+
+        @Override
+        public CompletableFuture<String> input() {
+            return CompletableFuture.completedFuture("SIMPLE TEXT");
+        }
+    }
 }

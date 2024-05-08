@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.collections.FXCollections?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
-<?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
@@ -13,8 +13,6 @@
 <?import org.fxmisc.flowless.VirtualizedScrollPane?>
 <?import org.fxmisc.richtext.CodeArea?>
 
-<?import java.lang.String?>
-<?import javafx.collections.FXCollections?>
 <AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
    <children>
       <AnchorPane AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -46,7 +44,7 @@
                   <Button layoutX="70.0" layoutY="13.0" mnemonicParsing="false" text="✂" />
                   <Button layoutX="90.0" layoutY="13.0" mnemonicParsing="false" text="🗐" />
                   <Button layoutX="110.0" layoutY="13.0" mnemonicParsing="false" text="📋" />
-                  <Button layoutX="130.0" layoutY="13.0" mnemonicParsing="false" />
+                  <Button id="runButton" fx:id="runButton" layoutX="130.0" layoutY="13.0" mnemonicParsing="false" text="▶" />
                   <Button layoutX="150.0" layoutY="13.0" mnemonicParsing="false" />
                   <Button layoutX="170.0" layoutY="13.0" mnemonicParsing="false" />
                   <Button layoutX="190.0" layoutY="13.0" mnemonicParsing="false" />
@@ -60,7 +58,7 @@
                      <children>
                         <VirtualizedScrollPane AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                             <content>
-                                <CodeArea fx:id="codeArea" id="codeArea" wrapText="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                                <CodeArea id="codeArea" fx:id="codeArea" wrapText="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
                             </content>
                         </VirtualizedScrollPane>
                      </children>
@@ -87,7 +85,7 @@
                               </AnchorPane>
                             <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="158.0" prefWidth="346.0">
                                  <children>
-                                    <TextArea layoutX="240.0" layoutY="-33.0" prefHeight="200.0" prefWidth="175.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                                    <TextArea id="outputArea" fx:id="outputArea" layoutX="240.0" layoutY="-33.0" prefHeight="200.0" prefWidth="175.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
                                  </children>
                               </AnchorPane>
                           </items>

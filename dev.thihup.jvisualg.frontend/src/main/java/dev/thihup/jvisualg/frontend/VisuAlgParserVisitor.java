@@ -40,6 +40,9 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitDeclarations(VisuAlgParser.DeclarationsContext ctx) {
+        if (ctx.children == null) {
+            return CompundNode.EMPTY;
+        }
         List<Node> list = ctx.children.stream()
             .map(this::visit)
             .filter(Objects::nonNull)
@@ -364,7 +367,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         if (ctx.parenExpression() instanceof VisuAlgParser.ParenExpressionContext parenExpressionContext) {
             return visit(parenExpressionContext.expr());
         }
-        if (ctx.SUB() != null) {
+        if (ctx.SUB() != null && ctx.expr().size() == 1) {
             return new NegNode(visit(ctx.expr(0)), fromRuleContext(ctx));
         }
         if (ctx.NOT() != null) {
@@ -469,7 +472,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitPausaCommand(VisuAlgParser.PausaCommandContext ctx) {
-        return new PausaCommandNode(fromRuleContext(ctx));
+        return new PausaCommandNode(EmptyNode.INSTANCE, fromRuleContext(ctx));
     }
 
 

@@ -2,28 +2,32 @@ package dev.thihup.jvisualg.interpreter;
 
 import dev.thihup.jvisualg.frontend.ASTResult;
 import dev.thihup.jvisualg.frontend.Main;
+import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
+import org.antlr.v4.runtime.misc.Pair;
 
 import java.io.*;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
+import java.util.concurrent.locks.Lock;
 
 public class Interpreter {
 
     private final Map<String, Object> global = new LinkedHashMap<>();
     private final Reader originalInput;
     private final Writer output;
+    private final Lock lock;
     private boolean running = true;
     private Scanner input;
 
-    Interpreter(Reader input, Writer output) {
+    private List<Location> breakpointLocations = new ArrayList<>();
+
+    Interpreter(Reader input, Writer output, Lock debuggerLock) {
         this.originalInput = input;
         this.input = new Scanner(input);
         this.output = output;
+        this.lock = debuggerLock;
     }
 
     public void run(Node node) {
@@ -31,6 +35,11 @@ public class Interpreter {
             return;
         }
         try {
+            if (breakpointLocations.stream()
+                    .anyMatch(location -> location.isInside(node.location().orElse(Location.EMPTY)))) {
+                lock.lock();
+            }
+
             switch (node) {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
                 case Node.ArrayTypeNode arrayTypeNode -> throw new UnsupportedOperationException("ArrayTypeNode not implemented");
@@ -52,7 +61,7 @@ public class Interpreter {
         }
     }
 
-    private void runCommand(Node.CommandNode commandNode) throws IOException {
+    private void runCommand(Node.CommandNode commandNode) throws IOException, InterruptedException {
         switch (commandNode) {
             case Node.AleatorioCommandNode aleatorioCommandNode -> throw new UnsupportedOperationException("AleatorioCommandNode not implemented");
             case Node.ArquivoCommandNode arquivoCommandNode -> throw new UnsupportedOperationException("ArquivoCommandNode not implemented");
@@ -182,13 +191,207 @@ public class Interpreter {
     private Object evaluate(Node.ExpressionNode node){
         return switch (node) {
             case Node.StringLiteralNode(var value, _) -> value;
-            case Node.BinaryNode binaryNode -> throw new UnsupportedOperationException("BinaryNode not implemented");
+            case Node.BinaryNode binaryNode -> evaluateBinaryNode(binaryNode);
             case Node.BooleanLiteralNode(var value, _) -> value;
             case Node.BooleanNode booleanNode -> throw new UnsupportedOperationException("BooleanNode not implemented");
             case Node.FunctionCallNode functionCallNode -> throw new UnsupportedOperationException("FunctionCallNode not implemented");
             case Node.IntLiteralNode(var value, _) -> value;
             case Node.RealLiteralNode(var value, _) -> value;
             case Node.IdNode idNode -> global.get(idNode.id());
+        };
+    }
+    record PairValue(Object left, Object right) {}
+    private Object evaluateBinaryNode(Node.BinaryNode binaryNode) {
+
+        return switch (binaryNode) {
+            case Node.AddNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() + y;
+                    case PairValue(Double x, Number y) -> x + y.doubleValue();
+
+                    case PairValue(Number x, Number y) -> x.intValue() + y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.DivNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() / y;
+                    case PairValue(Double x, Number y) -> x / y.doubleValue();
+
+                    case PairValue(Number x, Number y) -> x.intValue() / y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.ModNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() % y;
+                    case PairValue(Double x, Number y) -> x % y.doubleValue();
+
+                    case PairValue(Number x, Number y) -> x.intValue() % y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.MulNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() * y;
+                    case PairValue(Double x, Number y) -> x * y.doubleValue();
+
+                    case PairValue(Number x, Number y) -> x.intValue() * y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+
+            case Node.PowNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> Math.pow(x.doubleValue(),y);
+                    case PairValue(Double x, Number y) -> Math.pow(x, y.doubleValue());
+
+                    case PairValue(Number x, Number y) -> (int) Math.pow(x.intValue(), y.intValue());
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.SubNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() - y;
+                    case PairValue(Double x, Number y) -> x - y.doubleValue();
+
+                    case PairValue(Number x, Number y) -> x.intValue() - y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.RelationalNode relationalNode -> evaluateRelationalNode(relationalNode);
+            case Object o -> throw new UnsupportedOperationException("Operands should be expressions: " + o);
+        };
+    }
+
+    private Object evaluateRelationalNode(Node.RelationalNode relationalNode) {
+        return switch (relationalNode) {
+            case Node.AndNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Boolean x, Boolean y) -> x && y;
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.OrNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Boolean x, Boolean y) -> x || y;
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+
+            case Node.GeNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() >= y;
+                    case PairValue(Double x, Number y) -> x >= y.doubleValue();
+                    case PairValue(Boolean x, Boolean y) -> x || !y;
+                    case PairValue(Boolean _, Number y) -> y;
+                    case PairValue(Number _, Boolean y) -> y;
+
+                    case PairValue(Number x, Number y) -> x.intValue() >= y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.GtNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() > y;
+                    case PairValue(Double x, Number y) -> x > y.doubleValue();
+                    case PairValue(Boolean x, Boolean y) -> x && !y;
+                    case PairValue(Number x, Number y) -> x.intValue() > y.intValue();
+                    case PairValue(Boolean _, Number y) -> y;
+                    case PairValue(Number _, Boolean y) -> y;
+
+
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.LeNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() <= y;
+                    case PairValue(Double x, Number y) -> x <= y.doubleValue();
+                    case PairValue(Boolean x, Boolean y) -> !x || y;
+                    case PairValue(Boolean _, Number y) -> y;
+                    case PairValue(Number _, Boolean y) -> y;
+
+
+                    case PairValue(Number x, Number y) -> x.intValue() <= y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+            case Node.LtNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Number x, Double y) -> x.doubleValue() < y;
+                    case PairValue(Double x, Number y) -> x < y.doubleValue();
+                    case PairValue(Boolean x, Boolean y) -> !x && y;
+                    case PairValue(Boolean _, Number y) -> y;
+                    case PairValue(Number _, Boolean y) -> y;
+
+
+                    case PairValue(Number x, Number y) -> x.intValue() < y.intValue();
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+
+            case Node.EqNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Boolean _, Number y) -> y;
+                    case PairValue(Number _, Boolean y) -> y;
+                    case PairValue(Object x, Object y) -> x.equals(y);
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+
+            case Node.NeNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
+                Object leftResult = evaluate(left);
+                Object rightResult = evaluate(right);
+
+                yield switch (new PairValue(leftResult, rightResult)) {
+                    case PairValue(Boolean _, Number y) -> y;
+                    case PairValue(Number _, Boolean y) -> y;
+                    case PairValue(Object x, Object y) -> !x.equals(y);
+                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                };
+            }
+
+            case Object o -> throw new UnsupportedOperationException("Operands should be expressions: " + o);
         };
     }
 
@@ -230,5 +433,9 @@ public class Interpreter {
             };
             default -> throw new IllegalStateException("Unexpected value: " + typeNode);
         };
+    }
+
+    public void addBreakpoint(Location location) {
+        breakpointLocations.add(location);
     }
 }

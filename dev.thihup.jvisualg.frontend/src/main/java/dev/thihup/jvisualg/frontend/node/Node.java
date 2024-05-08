@@ -443,7 +443,9 @@ public sealed interface Node {
 
     sealed interface BooleanNode extends CommandNode, ExpressionNode {}
 
-    record AndNode(Node left, Node right, Optional<Location> location) implements BooleanNode, BinaryNode {
+    sealed interface RelationalNode extends BinaryNode, BooleanNode {}
+
+    record AndNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
         public AndNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -451,7 +453,7 @@ public sealed interface Node {
         }
     }
 
-    record OrNode(Node left, Node right, Optional<Location> location) implements BooleanNode, BinaryNode {
+    record OrNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
         public OrNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -466,7 +468,6 @@ public sealed interface Node {
         }
     }
 
-    sealed interface RelationalNode extends BinaryNode {}
 
     record EqNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
         public EqNode {
@@ -551,7 +552,7 @@ public sealed interface Node {
         }
     }
 
-    record PausaCommandNode(Optional<Location> location) implements CommandNode {
+    record PausaCommandNode(Node node, Optional<Location> location) implements CommandNode {
         public PausaCommandNode {
             Objects.requireNonNull(location);
         }
