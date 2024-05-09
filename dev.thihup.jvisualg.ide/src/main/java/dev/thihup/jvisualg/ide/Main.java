@@ -33,9 +33,9 @@ import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.reactfx.Subscription;
 
-import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.*;
+import java.nio.channels.Channels;
+import java.nio.channels.Pipe;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -51,13 +51,7 @@ import java.util.regex.Pattern;
 public class Main extends Application {
 
     private final ExecutorService fxClientExecutor = Executors.newSingleThreadExecutor();
-
-    private final ExecutorService lspClientExecutor = Executors.newSingleThreadExecutor();
-    private final ExecutorService lspServerExecutor = Executors.newSingleThreadExecutor();
-
-    private final ExecutorService dapClientExecutor = Executors.newSingleThreadExecutor();
-    private final ExecutorService dapServerExecutor = Executors.newSingleThreadExecutor();
-
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     @FXML
     private CodeArea codeArea;
@@ -157,36 +151,26 @@ public class Main extends Application {
     }
 
     private void setupLSP() throws IOException {
-        PipedInputStream lspInputClient = new PipedInputStream();
-        PipedOutputStream lspOutputClient = new PipedOutputStream();
-        PipedInputStream lspInputServer = new PipedInputStream();
-        PipedOutputStream lspOutputServer = new PipedOutputStream();
+        Pipe clientToServerPipe = Pipe.open();
+        Pipe serverToClientPipe = Pipe.open();
 
-        lspInputClient.connect(lspOutputServer);
-        lspOutputClient.connect(lspInputServer);
-
-        lspServer = VisualgLauncher.startServer(lspInputServer, lspOutputServer, lspServerExecutor);
-        clientLauncher = LSPLauncher.createClientLauncher(new VisualgLanguageClient(), lspInputClient, lspOutputClient, lspClientExecutor, null);
+        lspServer = VisualgLauncher.startServer(Channels.newInputStream(clientToServerPipe.source()), Channels.newOutputStream(serverToClientPipe.sink()), executor);
+        clientLauncher = LSPLauncher.createClientLauncher(new VisualgLanguageClient(), Channels.newInputStream(serverToClientPipe.source()), Channels.newOutputStream(clientToServerPipe.sink()), executor, null);
 
         lspClient = clientLauncher.startListening();
     }
 
     private void setupDAP() throws IOException {
-        PipedInputStream dapInputClient = new PipedInputStream();
-        PipedOutputStream dapOutputClient = new PipedOutputStream();
-        PipedInputStream dapInputServer  = new PipedInputStream();
-        PipedOutputStream dapOutputServer = new PipedOutputStream();
-
-        dapInputClient.connect(dapOutputServer);
-        dapOutputClient.connect(dapInputServer);
+        Pipe clientToServerPipe = Pipe.open();
+        Pipe serverToClientPipe = Pipe.open();
 
         DAPServer server = new DAPServer();
-        dapServerLauncher = DebugLauncher.createLauncher(server, DebugProtocolClientExtension.class, dapInputServer, dapOutputServer, dapServerExecutor, null);
+        dapServerLauncher = DebugLauncher.createLauncher(server, DebugProtocolClientExtension.class,
+            Channels.newInputStream(clientToServerPipe.source()), Channels.newOutputStream(serverToClientPipe.sink()), executor, null);
         server.connect(dapServerLauncher.getRemoteProxy());
         dapServerListener = dapServerLauncher.startListening();
 
-
-        dapClientLauncher = DSPLauncher.createClientLauncher(new DAPClient(), dapInputClient, dapOutputClient, dapClientExecutor, null);
+        dapClientLauncher = DSPLauncher.createClientLauncher(new DAPClient(), Channels.newInputStream(serverToClientPipe.source()), Channels.newOutputStream(clientToServerPipe.sink()), executor, null);
         dapClientListener = dapClientLauncher.startListening();
         dapClientLauncher.getRemoteProxy().initialize(new InitializeRequestArguments());
     }
@@ -286,10 +270,7 @@ public class Main extends Application {
         }
 
         fxClientExecutor.shutdown();
-        lspClientExecutor.shutdown();
-        dapClientExecutor.shutdown();
-        lspServerExecutor.shutdown();
-        dapServerExecutor.shutdown();
+        executor.shutdown();
     }
 
     private int toOffset(String text, Position position) {
