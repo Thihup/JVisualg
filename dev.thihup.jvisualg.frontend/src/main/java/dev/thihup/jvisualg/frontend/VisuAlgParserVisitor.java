@@ -131,7 +131,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
 
     @Override
-    public Node visitLiterais(VisuAlgParser.LiteraisContext ctx) {
+    public ExpressionNode visitLiterais(VisuAlgParser.LiteraisContext ctx) {
         TerminalNode falso = ctx.FALSO();
         if (falso != null) {
             return new BooleanLiteralNode(false, fromTerminalNode(falso));
@@ -150,7 +150,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         }
         TerminalNode inteiro = ctx.INT_LITERAL();
         if (inteiro != null) {
-            return new RealLiteralNode(Integer.parseInt(inteiro.getText()), fromTerminalNode(inteiro));
+            return new IntLiteralNode(Integer.parseInt(inteiro.getText()), fromTerminalNode(inteiro));
         }
         throw new RuntimeException("Unknown literal: " + ctx.getText());
     }
@@ -229,10 +229,12 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
 
     @Override
-    public Node visitIdOrArray(VisuAlgParser.IdOrArrayContext ctx) {
+    public ExpressionNode visitIdOrArray(VisuAlgParser.IdOrArrayContext ctx) {
         return ctx.children
             .stream()
             .map(this::visit)
+            .filter(x -> x instanceof ExpressionNode)
+            .map(x -> (ExpressionNode) x)
             .reduce((result, element) -> switch (element) {
                 case ArrayAccessNode(_, CompundNode indexes, var location) ->
                         new ArrayAccessNode(result, indexes, location);
@@ -291,7 +293,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitWriteItem(VisuAlgParser.WriteItemContext ctx) {
-        Node expr = visit(ctx.expr(0));
+        ExpressionNode expr = visitExpr(ctx.expr(0));
         Node spaces = ctx.expr(1) != null ? visit(ctx.expr(1)) : EmptyNode.INSTANCE;
         Node precision = ctx.expr(2) != null ? visit(ctx.expr(2)) : EmptyNode.INSTANCE;
 
@@ -301,7 +303,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitConditionalCommand(VisuAlgParser.ConditionalCommandContext ctx) {
-        Node expr = visit(ctx.expr());
+        ExpressionNode expr = visitExpr(ctx.expr());
         CompundNode commands = ctx.commands(0).command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
         VisuAlgParser.CommandsContext commands1 = ctx.commands(1);
         if (commands1 == null || commands1.command().isEmpty()) {
@@ -360,50 +362,50 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     }
 
     @Override
-    public Node visitExpr(VisuAlgParser.ExprContext ctx) {
+    public ExpressionNode visitExpr(VisuAlgParser.ExprContext ctx) {
         if (ctx.atom() instanceof VisuAlgParser.AtomContext atomContext) {
-            return visit(atomContext);
+            return visitAtom(atomContext);
         }
         if (ctx.parenExpression() instanceof VisuAlgParser.ParenExpressionContext parenExpressionContext) {
-            return visit(parenExpressionContext.expr());
+            return visitExpr(parenExpressionContext.expr());
         }
         if (ctx.SUB() != null && ctx.expr().size() == 1) {
-            return new NegNode(visit(ctx.expr(0)), fromRuleContext(ctx));
+            return new NegNode(visitExpr(ctx.expr(0)), fromRuleContext(ctx));
         }
         if (ctx.NOT() != null) {
-            return new NotNode(visit(ctx.expr(0)), fromRuleContext(ctx));
+            return new NotNode(visitExpr(ctx.expr(0)), fromRuleContext(ctx));
         }
         String text = ctx.getChild(1).getText();
         return switch (text.toLowerCase()) {
-            case "+" -> new AddNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "-" -> new SubNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "*" -> new MulNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "/", "div", "\\" -> new DivNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "e" -> new AndNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "ou" -> new OrNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "nao", "não" -> new NotNode(visit(ctx.expr(0)), fromRuleContext(ctx));
-            case "=" -> new EqNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "<" -> new LtNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case ">" -> new GtNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "<=" -> new LeNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case ">=" -> new GeNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "<>" -> new NeNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "%", "mod" -> new ModNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
-            case "pot" -> new PowNode(visit(ctx.expr(0)), visit(ctx.expr(1)), fromRuleContext(ctx));
+            case "+" -> new AddNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "-" -> new SubNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "*" -> new MulNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "/", "div", "\\" -> new DivNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "e" -> new AndNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "ou" -> new OrNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "nao", "não" -> new NotNode(visitExpr(ctx.expr(0)), fromRuleContext(ctx));
+            case "=" -> new EqNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "<" -> new LtNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case ">" -> new GtNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "<=" -> new LeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case ">=" -> new GeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "<>" -> new NeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "%", "mod" -> new ModNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "pot" -> new PowNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             default -> throw new UnsupportedOperationException(text + " -> " + ctx.getParent().getText());
         };
     }
 
     @Override
-    public Node visitAtom(VisuAlgParser.AtomContext ctx) {
+    public ExpressionNode visitAtom(VisuAlgParser.AtomContext ctx) {
         if (ctx.idOrArray() != null) {
-            return visit(ctx.idOrArray());
+            return visitIdOrArray(ctx.idOrArray());
         }
         if (ctx.literais() != null) {
-            return visit(ctx.literais());
+            return visitLiterais(ctx.literais());
         }
         if (ctx.functionCall() != null) {
-            return visit(ctx.functionCall());
+            return visitFunctionCall(ctx.functionCall());
         }
         throw new UnsupportedOperationException(ctx.getText());
     }
@@ -437,7 +439,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     }
 
     @Override
-    public Node visitFunctionCall(VisuAlgParser.FunctionCallContext ctx) {
+    public ExpressionNode visitFunctionCall(VisuAlgParser.FunctionCallContext ctx) {
         IdNode name = visitId(ctx.ID());
         VisuAlgParser.ExprListContext exprListContext = ctx.exprList();
         if (exprListContext == null) {

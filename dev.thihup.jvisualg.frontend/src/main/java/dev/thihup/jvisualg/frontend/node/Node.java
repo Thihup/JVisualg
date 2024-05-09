@@ -18,6 +18,15 @@ public sealed interface Node {
         }
     }
 
+    enum EmptyExpressionNode implements ExpressionNode {
+        INSTANCE;
+
+        @Override
+        public Optional<Location> location() {
+            return Optional.empty();
+        }
+    }
+
     default Stream<Node> visitChildren() {
         Stream<Node> childrenNode = switch (this) {
             case AlgoritimoNode(var literalNode, var declarations, var commands, _) ->
@@ -123,7 +132,7 @@ public sealed interface Node {
             case InterrompaCommandNode _ -> Stream.of();
             case NotNode(var expr, _) -> Stream.of(expr);
             case ReturnNode(var expr, _) -> Stream.of(expr);
-            case EmptyNode _ -> Stream.of();
+            case EmptyNode _, EmptyExpressionNode _ -> Stream.of();
         };
         return childrenNode.mapMulti((Node element, Consumer<Node>  downstream) -> {
             downstream.accept(element);
@@ -279,7 +288,7 @@ public sealed interface Node {
         }
     }
 
-    record ArrayAccessNode(Node node, CompundNode indexes, Optional<Location> location) implements CommandNode {
+    record ArrayAccessNode(Node node, CompundNode indexes, Optional<Location> location) implements ExpressionNode {
         public ArrayAccessNode {
             Objects.requireNonNull(node);
             Objects.requireNonNull(indexes);
@@ -287,7 +296,7 @@ public sealed interface Node {
         }
     }
 
-    record MemberAccessNode(Node node, Node member, Optional<Location> location) implements CommandNode {
+    record MemberAccessNode(Node node, Node member, Optional<Location> location) implements ExpressionNode {
         public MemberAccessNode {
             Objects.requireNonNull(node);
             Objects.requireNonNull(member);
@@ -309,7 +318,7 @@ public sealed interface Node {
         }
     }
 
-    record WriteItemNode(Node expr, Node spaces, Node precision, Optional<Location> location) implements CommandNode {
+    record WriteItemNode(ExpressionNode expr, Node spaces, Node precision, Optional<Location> location) implements CommandNode {
         public WriteItemNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(spaces);
@@ -318,7 +327,7 @@ public sealed interface Node {
         }
     }
 
-    record ConditionalCommandNode(Node expr, CompundNode commands, CompundNode elseCommands, Optional<Location> location) implements CommandNode {
+    record ConditionalCommandNode(ExpressionNode expr, CompundNode commands, CompundNode elseCommands, Optional<Location> location) implements CommandNode {
         public ConditionalCommandNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(commands);
@@ -388,12 +397,12 @@ public sealed interface Node {
     }
 
     sealed interface BinaryNode extends CommandNode, ExpressionNode {
-        Node left();
+        ExpressionNode left();
 
-        Node right();
+        ExpressionNode right();
     }
 
-    record AddNode(Node left, Node right, Optional<Location> location) implements BinaryNode {
+    record AddNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements BinaryNode {
         public AddNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -401,7 +410,7 @@ public sealed interface Node {
         }
     }
 
-    record SubNode(Node left, Node right, Optional<Location> location) implements BinaryNode {
+    record SubNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements BinaryNode {
         public SubNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -409,7 +418,7 @@ public sealed interface Node {
         }
     }
 
-    record MulNode(Node left, Node right, Optional<Location> location) implements BinaryNode {
+    record MulNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements BinaryNode {
         public MulNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -417,7 +426,7 @@ public sealed interface Node {
         }
     }
 
-    record DivNode(Node left, Node right, Optional<Location> location) implements BinaryNode {
+    record DivNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements BinaryNode {
         public DivNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -425,7 +434,7 @@ public sealed interface Node {
         }
     }
 
-    record ModNode(Node left, Node right, Optional<Location> location) implements BinaryNode {
+    record ModNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements BinaryNode {
         public ModNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -433,7 +442,7 @@ public sealed interface Node {
         }
     }
 
-    record PowNode(Node left, Node right, Optional<Location> location) implements BinaryNode {
+    record PowNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements BinaryNode {
         public PowNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -445,7 +454,7 @@ public sealed interface Node {
 
     sealed interface RelationalNode extends BinaryNode, BooleanNode {}
 
-    record AndNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record AndNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public AndNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -453,7 +462,7 @@ public sealed interface Node {
         }
     }
 
-    record OrNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record OrNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public OrNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -461,7 +470,7 @@ public sealed interface Node {
         }
     }
 
-    record NotNode(Node expr, Optional<Location> location) implements BooleanNode {
+    record NotNode(ExpressionNode expr, Optional<Location> location) implements BooleanNode {
         public NotNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(location);
@@ -469,7 +478,7 @@ public sealed interface Node {
     }
 
 
-    record EqNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record EqNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public EqNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -477,7 +486,7 @@ public sealed interface Node {
         }
     }
 
-    record NeNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record NeNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public NeNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -485,7 +494,7 @@ public sealed interface Node {
         }
     }
 
-    record LtNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record LtNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public LtNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -493,7 +502,7 @@ public sealed interface Node {
         }
     }
 
-    record LeNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record LeNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public LeNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -501,7 +510,7 @@ public sealed interface Node {
         }
     }
 
-    record GtNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record GtNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public GtNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -509,7 +518,7 @@ public sealed interface Node {
         }
     }
 
-    record GeNode(Node left, Node right, Optional<Location> location) implements RelationalNode {
+    record GeNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements RelationalNode {
         public GeNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);
@@ -517,14 +526,14 @@ public sealed interface Node {
         }
     }
 
-    record NegNode(Node expr, Optional<Location> location) implements CommandNode {
+    record NegNode(ExpressionNode expr, Optional<Location> location) implements ExpressionNode {
         public NegNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(location);
         }
     }
 
-    record PosNode(Node expr, Optional<Location> location) implements CommandNode {
+    record PosNode(ExpressionNode expr, Optional<Location> location) implements ExpressionNode {
         public PosNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(location);

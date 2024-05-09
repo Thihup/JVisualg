@@ -52,6 +52,7 @@ public class Interpreter {
                 case Node.SubprogramDeclarationNode subprogramDeclarationNode -> throw new UnsupportedOperationException("SubprogramDeclarationNode not implemented");
                 case Node.TypeNode typeNode -> throw new UnsupportedOperationException("TypeNode not implemented");
                 case Node.VariableDeclarationNode variableDeclarationNode -> runVariableDeclaration(variableDeclarationNode);
+                case Node.ExpressionNode e -> evaluate(e);
             }
         } catch (InterruptedException | IOException _) {
             running = false;
@@ -62,13 +63,12 @@ public class Interpreter {
         switch (commandNode) {
             case Node.AleatorioCommandNode aleatorioCommandNode -> throw new UnsupportedOperationException("AleatorioCommandNode not implemented");
             case Node.ArquivoCommandNode arquivoCommandNode -> throw new UnsupportedOperationException("ArquivoCommandNode not implemented");
-            case Node.ArrayAccessNode arrayAccessNode -> throw new UnsupportedOperationException("ArrayAccessNode not implemented");
             case Node.AssignmentNode assignmentNode -> throw new UnsupportedOperationException("AssignmentNode not implemented");
             case Node.BinaryNode binaryNode -> throw new UnsupportedOperationException("BinaryNode not implemented");
             case Node.BooleanNode booleanNode -> throw new UnsupportedOperationException("BooleanNode not implemented");
             case Node.ChooseCaseNode chooseCaseNode -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
             case Node.ChooseCommandNode chooseCommandNode -> throw new UnsupportedOperationException("ChooseCommandNode not implemented");
-            case Node.ConditionalCommandNode conditionalCommandNode -> throw new UnsupportedOperationException("ConditionalCommandNode not implemented");
+            case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
             case Node.CronometroCommandNode cronometroCommandNode -> throw new UnsupportedOperationException("CronometroCommandNode not implemented");
             case Node.DebugCommandNode debugCommandNode -> throw new UnsupportedOperationException("DebugCommandNode not implemented");
             case Node.EcoCommandNode ecoCommandNode -> throw new UnsupportedOperationException("EcoCommandNode not implemented");
@@ -77,10 +77,7 @@ public class Interpreter {
             case Node.IncrementNode incrementNode -> throw new UnsupportedOperationException("IncrementNode not implemented");
             case Node.InterrompaCommandNode interrompaCommandNode -> throw new UnsupportedOperationException("InterrompaCommandNode not implemented");
             case Node.LimpatelaCommandNode limpatelaCommandNode -> throw new UnsupportedOperationException("LimpatelaCommandNode not implemented");
-            case Node.MemberAccessNode memberAccessNode -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
-            case Node.NegNode negNode -> throw new UnsupportedOperationException("NegNode not implemented");
             case Node.PausaCommandNode pausaCommandNode -> throw new UnsupportedOperationException("PausaCommandNode not implemented");
-            case Node.PosNode posNode -> throw new UnsupportedOperationException("PosNode not implemented");
             case Node.ProcedureCallNode procedureCallNode -> throw new UnsupportedOperationException("ProcedureCallNode not implemented");
             case Node.ReadCommandNode readCommandNode -> runReadCommand(readCommandNode);
             case Node.ReturnNode returnNode -> throw new UnsupportedOperationException("ReturnNode not implemented");
@@ -98,6 +95,18 @@ public class Interpreter {
                 printValue(value, spaces, precision);
             }
             case Node.WriteItemNode(Node a, _, _, _) -> throw new UnsupportedOperationException("the value to write must be an expression: " + a.getClass());
+        }
+    }
+
+    private void runConditionalCommand(Node.ConditionalCommandNode conditionalCommandNode) {
+        if (conditionalCommandNode instanceof Node.ConditionalCommandNode(Node.ExpressionNode expressionNode, Node.CompundNode command, Node.CompundNode elseCommand, _)) {
+            if ((Boolean) evaluate(expressionNode)) {
+                run(command);
+            } else {
+                run(elseCommand);
+            }
+        } else {
+            throw new UnsupportedOperationException("Test should be an expression: " + conditionalCommandNode);
         }
     }
 
@@ -143,6 +152,10 @@ public class Interpreter {
 
     private void printValue(Object value, Node spaces, Node precision) throws IOException {
 
+        if (value instanceof Integer i) {
+            value = i.doubleValue();
+        }
+
         int spacesValue = switch (spaces) {
             case Node.ExpressionNode e when evaluate(e) instanceof Number p -> p.intValue();
             case Node.EmptyNode _ -> 0;
@@ -160,9 +173,6 @@ public class Interpreter {
         numberFormat.setMaximumFractionDigits(0);
         numberFormat.setMinimumFractionDigits(0);
         output.write(switch (value) {
-            case Integer integer when spacesValue >= 2 -> String.format("%s%d", " ".repeat(spacesValue - 1), integer);
-            case Integer integer -> String.format(" %d", integer);
-
             case Double doubleValue when spacesValue >= 1 && precisionValue >= 1 -> {
                 numberFormat.setMinimumFractionDigits(precisionValue);
                 numberFormat.setMaximumFractionDigits(precisionValue);
@@ -190,11 +200,16 @@ public class Interpreter {
             case Node.StringLiteralNode(var value, _) -> value;
             case Node.BinaryNode binaryNode -> evaluateBinaryNode(binaryNode);
             case Node.BooleanLiteralNode(var value, _) -> value;
-            case Node.BooleanNode booleanNode -> throw new UnsupportedOperationException("BooleanNode not implemented");
             case Node.FunctionCallNode functionCallNode -> throw new UnsupportedOperationException("FunctionCallNode not implemented");
             case Node.IntLiteralNode(var value, _) -> value;
             case Node.RealLiteralNode(var value, _) -> value;
-            case Node.IdNode idNode -> global.get(idNode.id());
+            case Node.IdNode(String id, _) -> global.get(id);
+            case Node.NegNode nedNode -> throw new UnsupportedOperationException("NegNode not implemented");
+            case Node.PosNode(Node.ExpressionNode e, _) -> evaluate(e);
+            case Node.NotNode notNode -> throw new UnsupportedOperationException("NotNode not implemented");
+            case Node.EmptyExpressionNode _ -> 0;
+            case Node.ArrayAccessNode arrayAccessNode -> throw new UnsupportedOperationException("ArrayAccessNode not implemented");
+            case Node.MemberAccessNode memberAccessNode -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
         };
     }
     record PairValue(Object left, Object right) {}
@@ -222,7 +237,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x / y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() / y.intValue();
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported div node types: " + o);
                 };
             }
             case Node.ModNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -234,7 +249,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x % y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() % y.intValue();
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported mod node types: " + o);
                 };
             }
             case Node.MulNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -246,7 +261,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x * y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() * y.intValue();
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported mul node types: " + o);
                 };
             }
 
@@ -259,7 +274,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> Math.pow(x, y.doubleValue());
 
                     case PairValue(Number x, Number y) -> (int) Math.pow(x.intValue(), y.intValue());
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported pow node types: " + o);
                 };
             }
             case Node.SubNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -271,11 +286,10 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x - y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() - y.intValue();
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported sub node types: " + o);
                 };
             }
             case Node.RelationalNode relationalNode -> evaluateRelationalNode(relationalNode);
-            case Object o -> throw new UnsupportedOperationException("Operands should be expressions: " + o);
         };
     }
 
@@ -287,7 +301,7 @@ public class Interpreter {
 
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean x, Boolean y) -> x && y;
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported and node types: " + o);
                 };
             }
             case Node.OrNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -296,7 +310,7 @@ public class Interpreter {
 
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean x, Boolean y) -> x || y;
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported or node types: " + o);
                 };
             }
 
@@ -312,7 +326,7 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
 
                     case PairValue(Number x, Number y) -> x.intValue() >= y.intValue();
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported ge node types: " + o);
                 };
             }
             case Node.GtNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -328,7 +342,7 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
 
 
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported gt node types: " + o);
                 };
             }
             case Node.LeNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -344,7 +358,7 @@ public class Interpreter {
 
 
                     case PairValue(Number x, Number y) -> x.intValue() <= y.intValue();
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported le node types: " + o);
                 };
             }
             case Node.LtNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -360,7 +374,7 @@ public class Interpreter {
 
 
                     case PairValue(Number x, Number y) -> x.intValue() < y.intValue();
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported lt node types: " + o);
                 };
             }
 
@@ -372,7 +386,7 @@ public class Interpreter {
                     case PairValue(Boolean _, Number y) -> y;
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(Object x, Object y) -> x.equals(y);
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported eq node types: " + o);
                 };
             }
 
@@ -384,11 +398,9 @@ public class Interpreter {
                     case PairValue(Boolean _, Number y) -> y;
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(Object x, Object y) -> !x.equals(y);
-                    case Object o -> throw new UnsupportedOperationException("unsupported add node types: " + o);
+                    case Object o -> throw new UnsupportedOperationException("unsupported ne node types: " + o);
                 };
             }
-
-            case Object o -> throw new UnsupportedOperationException("Operands should be expressions: " + o);
         };
     }
 
