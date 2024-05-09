@@ -172,7 +172,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     private Node rangeToNode(TerminalNode ctx) {
         String[] values = ctx.getText().split("\\.\\.");
         assert values.length == 2;
-        Node min, max;
+        ExpressionNode min, max;
         try {
             min = new IntLiteralNode(Integer.parseInt(values[0]), fromTerminalNode(ctx));
         } catch (NumberFormatException e) {
@@ -212,7 +212,8 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitReturn(VisuAlgParser.ReturnContext ctx) {
-        return new ReturnNode(visit(ctx.expr()), fromRuleContext(ctx));
+        ExpressionNode expr = ctx.expr() instanceof VisuAlgParser.ExprContext e? visitExpr(e) : EmptyExpressionNode.INSTANCE;
+        return new ReturnNode(expr, fromRuleContext(ctx));
     }
 
 
@@ -224,7 +225,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitAssignment(VisuAlgParser.AssignmentContext ctx) {
-        return new AssignmentNode(visit(ctx.idOrArray()), visit(ctx.expr()), fromRuleContext(ctx));
+        return new AssignmentNode(visit(ctx.idOrArray()), visitExpr(ctx.expr()), fromRuleContext(ctx));
     }
 
 
@@ -316,7 +317,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitChooseCommand(VisuAlgParser.ChooseCommandContext ctx) {
-        Node expr = visit(ctx.expr());
+        ExpressionNode expr = visitExpr(ctx.expr());
         CompundNode cases = ctx.chooseCase().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
         VisuAlgParser.OutroCaseContext outroCaseContext = ctx.outroCase();
         Node defaultCase = outroCaseContext != null ? visit(outroCaseContext) : EmptyNode.INSTANCE;
@@ -333,15 +334,15 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     @Override
     public Node visitOutroCase(VisuAlgParser.OutroCaseContext ctx) {
         CompundNode commands = ctx.commands().command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
-        return new ChooseCaseNode(EmptyNode.INSTANCE, commands, fromRuleContext(ctx));
+        return new ChooseCaseNode(EmptyExpressionNode.INSTANCE, commands, fromRuleContext(ctx));
     }
 
     @Override
-    public Node visitExprOrAte(VisuAlgParser.ExprOrAteContext ctx) {
+    public ExpressionNode visitExprOrAte(VisuAlgParser.ExprOrAteContext ctx) {
         if (ctx.ATE() != null) {
-            return new RangeNode(visit(ctx.expr(0)), visit(ctx.expr(1)),fromRuleContext(ctx));
+            return new RangeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)),fromRuleContext(ctx));
         }
-        return visit(ctx.expr(0));
+        return visitExpr(ctx.expr(0));
     }
 
     @Override
@@ -414,14 +415,14 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitEnquantoCommand(VisuAlgParser.EnquantoCommandContext ctx) {
-        Node test = visit(ctx.expr());
+        ExpressionNode test = visitExpr(ctx.expr());
         CompundNode commands = ctx.commands().command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
         return new WhileCommandNode(test, commands, false, fromRuleContext(ctx));
     }
 
     @Override
     public Node visitRepitaCommand(VisuAlgParser.RepitaCommandContext ctx) {
-        Node test = ctx.expr() instanceof VisuAlgParser.ExprContext v ? visit(v) : new BooleanLiteralNode(true, fromRuleContext(ctx));
+        ExpressionNode test = ctx.expr() instanceof VisuAlgParser.ExprContext v ? visitExpr(v) : new BooleanLiteralNode(false, fromRuleContext(ctx));
         CompundNode commands = ctx.commands().command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
         return new WhileCommandNode(test, commands, true, fromRuleContext(ctx));
     }

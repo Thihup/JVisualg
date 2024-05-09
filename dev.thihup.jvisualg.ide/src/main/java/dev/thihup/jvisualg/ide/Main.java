@@ -309,6 +309,7 @@ public class Main extends Application {
     private static final String KEYWORD_PATTERN = "(?i)\\b(" + String.join("|", KEYWORDS) + ")\\b";
     private static final String SPECIAL_PATTERN = "(?i)\\b(" + String.join("|", SPECIAL_KEYWORDS) + ")\\b";
     private static final String TYPES_PATTERN = "(?i)\\b(" + String.join("|", DATA_TYPES) + ")\\b";
+    private static final String BOOLEAN_PATTERN = "(?i)\\b(VERDADEIRO|FALSO)\\b";
     private static final String COMMENT_PATTERN = "//[^\\n\\r]+?(?:\\*\\)|[\\n\\r])";
     private static final String NUMBER_PATTERN = "(?<![a-zA-Z])\\d+";
 
@@ -318,6 +319,7 @@ public class Main extends Application {
                     + "|(?<STRING>" + STRING_PATTERN + ")"
                     + "|(?<COMMENT>" + COMMENT_PATTERN + ")"
                     + "|(?<NUMBER>" + NUMBER_PATTERN + ")"
+                    + "|(?<BOOLEAN>" + BOOLEAN_PATTERN + ")"
                     + "|(?<TYPE>" + TYPES_PATTERN + ")"
                     + "|(?<SPECIAL>" + SPECIAL_PATTERN + ")");
 
@@ -355,6 +357,7 @@ public class Main extends Application {
                 case Matcher _ when matcher.group("NUMBER") != null -> List.of("number");
                 case Matcher _ when matcher.group("TYPE") != null -> List.of("dataType", "underline");
                 case Matcher _ when matcher.group("SPECIAL") != null -> List.of("special", "underline");
+                case Matcher _ when matcher.group("BOOLEAN") != null -> List.of("number");
                 default -> throw new IllegalStateException("Unexpected value: " + matcher);
 
             };

@@ -45,9 +45,6 @@ public class Interpreter {
                 case Node.ConstantNode constantNode -> throw new UnsupportedOperationException("ConstantNode not implemented");
                 case Node.DosNode dosNode -> {}
                 case Node.EmptyNode emptyNode -> {}
-                case Node.IdNode idNode -> throw new UnsupportedOperationException("IdNode not implemented");
-                case Node.LiteralNode literalNode -> throw new UnsupportedOperationException("LiteralNode not implemented");
-                case Node.RangeNode rangeNode -> throw new UnsupportedOperationException("RangeNode not implemented");
                 case Node.RegistroDeclarationNode registroDeclarationNode -> throw new UnsupportedOperationException("RegistroDeclarationNode not implemented");
                 case Node.SubprogramDeclarationNode subprogramDeclarationNode -> throw new UnsupportedOperationException("SubprogramDeclarationNode not implemented");
                 case Node.TypeNode typeNode -> throw new UnsupportedOperationException("TypeNode not implemented");
@@ -63,9 +60,7 @@ public class Interpreter {
         switch (commandNode) {
             case Node.AleatorioCommandNode aleatorioCommandNode -> throw new UnsupportedOperationException("AleatorioCommandNode not implemented");
             case Node.ArquivoCommandNode arquivoCommandNode -> throw new UnsupportedOperationException("ArquivoCommandNode not implemented");
-            case Node.AssignmentNode assignmentNode -> throw new UnsupportedOperationException("AssignmentNode not implemented");
-            case Node.BinaryNode binaryNode -> throw new UnsupportedOperationException("BinaryNode not implemented");
-            case Node.BooleanNode booleanNode -> throw new UnsupportedOperationException("BooleanNode not implemented");
+            case Node.AssignmentNode assignmentNode -> runAssignment(assignmentNode);
             case Node.ChooseCaseNode chooseCaseNode -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
             case Node.ChooseCommandNode chooseCommandNode -> throw new UnsupportedOperationException("ChooseCommandNode not implemented");
             case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
@@ -73,28 +68,63 @@ public class Interpreter {
             case Node.DebugCommandNode debugCommandNode -> throw new UnsupportedOperationException("DebugCommandNode not implemented");
             case Node.EcoCommandNode ecoCommandNode -> throw new UnsupportedOperationException("EcoCommandNode not implemented");
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
-            case Node.FunctionCallNode functionCallNode -> throw new UnsupportedOperationException("FunctionCallNode not implemented");
             case Node.IncrementNode incrementNode -> throw new UnsupportedOperationException("IncrementNode not implemented");
-            case Node.InterrompaCommandNode interrompaCommandNode -> throw new UnsupportedOperationException("InterrompaCommandNode not implemented");
+            case Node.InterrompaCommandNode interrompaCommandNode -> runInterrompaCommand(interrompaCommandNode);
             case Node.LimpatelaCommandNode limpatelaCommandNode -> throw new UnsupportedOperationException("LimpatelaCommandNode not implemented");
             case Node.PausaCommandNode pausaCommandNode -> throw new UnsupportedOperationException("PausaCommandNode not implemented");
             case Node.ProcedureCallNode procedureCallNode -> throw new UnsupportedOperationException("ProcedureCallNode not implemented");
             case Node.ReadCommandNode readCommandNode -> runReadCommand(readCommandNode);
             case Node.ReturnNode returnNode -> throw new UnsupportedOperationException("ReturnNode not implemented");
             case Node.TimerCommandNode timerCommandNode -> throw new UnsupportedOperationException("TimerCommandNode not implemented");
-            case Node.WhileCommandNode whileCommandNode -> throw new UnsupportedOperationException("WhileCommandNode not implemented");
-            case Node.WriteCommandNode writeCommandNode -> {
-                run(writeCommandNode.writeList());
-                if (writeCommandNode.newLine()) {
-                    output.write("\n");
+            case Node.WhileCommandNode whileCommandNode -> runWhileCommand(whileCommandNode);
+            case Node.WriteCommandNode writeCommandNode -> runWriteCommandNode(writeCommandNode);
+            case Node.WriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision, _) -> runWriteItemNode(expr, spaces, precision);
+        }
+    }
+
+    private static class BreakException extends RuntimeException {
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
+        }
+    }
+
+    private void runInterrompaCommand(Node.InterrompaCommandNode interrompaCommandNode) {
+        throw new BreakException();
+    }
+
+    private void runAssignment(Node.AssignmentNode assignmentNode) {
+        if (assignmentNode.idOrArray() instanceof Node.IdNode idNode) {
+            global.put(idNode.id(), evaluate(assignmentNode.expr()));
+        } else {
+            throw new UnsupportedOperationException("Unsupported type: " + assignmentNode);
+        }
+    }
+
+    private void runWriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision) throws IOException {
+        printValue(evaluate(expr), spaces, precision);
+    }
+
+    private void runWriteCommandNode(Node.WriteCommandNode writeCommandNode) throws IOException {
+        run(writeCommandNode.writeList());
+        if (writeCommandNode.newLine()) {
+            output.write("\n");
+        }
+        output.flush();
+    }
+
+    private void runWhileCommand(Node.WhileCommandNode whileCommandNode) {
+        try {
+            if (whileCommandNode.conditionAtEnd()) {
+                do {
+                    run(whileCommandNode.commands());
+                } while (!(Boolean) evaluate(whileCommandNode.test()));
+            } else {
+                while ((Boolean) evaluate(whileCommandNode.test())) {
+                    run(whileCommandNode.commands());
                 }
-                output.flush();
             }
-            case Node.WriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision, _) -> {
-                Object value = evaluate(expr);
-                printValue(value, spaces, precision);
-            }
-            case Node.WriteItemNode(Node a, _, _, _) -> throw new UnsupportedOperationException("the value to write must be an expression: " + a.getClass());
+        } catch (BreakException _) {
         }
     }
 
@@ -210,6 +240,7 @@ public class Interpreter {
             case Node.EmptyExpressionNode _ -> 0;
             case Node.ArrayAccessNode arrayAccessNode -> throw new UnsupportedOperationException("ArrayAccessNode not implemented");
             case Node.MemberAccessNode memberAccessNode -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
+            case Node.RangeNode rangeNode -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
         };
     }
     record PairValue(Object left, Object right) {}

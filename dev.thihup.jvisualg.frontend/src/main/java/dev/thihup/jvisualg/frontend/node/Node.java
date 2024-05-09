@@ -252,7 +252,7 @@ public sealed interface Node {
         }
     }
 
-    record ReturnNode(Node expr, Optional<Location> location) implements CommandNode {
+    record ReturnNode(ExpressionNode expr, Optional<Location> location) implements CommandNode {
         public ReturnNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(location);
@@ -273,7 +273,7 @@ public sealed interface Node {
         }
     }
 
-    record AssignmentNode(Node idOrArray, Node expr, Optional<Location> location) implements CommandNode {
+    record AssignmentNode(Node idOrArray, ExpressionNode expr, Optional<Location> location) implements CommandNode {
         public AssignmentNode {
             Objects.requireNonNull(idOrArray);
             Objects.requireNonNull(expr);
@@ -336,7 +336,7 @@ public sealed interface Node {
         }
     }
 
-    record RangeNode(Node start, Node end, Optional<Location> location) implements Node {
+    record RangeNode(ExpressionNode start, ExpressionNode end, Optional<Location> location) implements ExpressionNode {
         public RangeNode {
             Objects.requireNonNull(start);
             Objects.requireNonNull(end);
@@ -344,7 +344,7 @@ public sealed interface Node {
         }
     }
 
-    record ChooseCommandNode(Node expr, CompundNode cases, Node defaultCase, Optional<Location> location) implements CommandNode {
+    record ChooseCommandNode(ExpressionNode expr, CompundNode cases, Node defaultCase, Optional<Location> location) implements CommandNode {
         public ChooseCommandNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(cases);
@@ -361,7 +361,7 @@ public sealed interface Node {
         }
     }
 
-    record WhileCommandNode(Node test, CompundNode commands, boolean conditionAtEnd, Optional<Location> location) implements CommandNode {
+    record WhileCommandNode(ExpressionNode test, CompundNode commands, boolean conditionAtEnd, Optional<Location> location) implements CommandNode {
         public WhileCommandNode {
             Objects.requireNonNull(test);
             Objects.requireNonNull(commands);
@@ -388,7 +388,7 @@ public sealed interface Node {
         }
     }
 
-    record FunctionCallNode(IdNode name, CompundNode args, Optional<Location> location) implements CommandNode, ExpressionNode {
+    record FunctionCallNode(IdNode name, CompundNode args, Optional<Location> location) implements ExpressionNode {
         public FunctionCallNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(args);
@@ -396,7 +396,7 @@ public sealed interface Node {
         }
     }
 
-    sealed interface BinaryNode extends CommandNode, ExpressionNode {
+    sealed interface BinaryNode extends ExpressionNode {
         ExpressionNode left();
 
         ExpressionNode right();
@@ -450,7 +450,7 @@ public sealed interface Node {
         }
     }
 
-    sealed interface BooleanNode extends CommandNode, ExpressionNode {}
+    sealed interface BooleanNode extends Node, ExpressionNode {}
 
     sealed interface RelationalNode extends BinaryNode, BooleanNode {}
 
@@ -470,7 +470,7 @@ public sealed interface Node {
         }
     }
 
-    record NotNode(ExpressionNode expr, Optional<Location> location) implements BooleanNode {
+    record NotNode(ExpressionNode expr, Optional<Location> location) implements BooleanNode, ExpressionNode {
         public NotNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(location);
