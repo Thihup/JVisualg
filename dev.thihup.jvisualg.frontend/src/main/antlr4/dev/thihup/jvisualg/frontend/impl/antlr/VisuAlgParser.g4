@@ -1,6 +1,9 @@
 parser grammar VisuAlgParser;
 
-options { tokenVocab=VisuAlgLexer; }
+options {
+    tokenVocab = VisuAlgLexer;
+    caseInsensitive = true;
+}
 
 // Algorithm structure
 algorithm : ALGORITMO STRING declarations INICIO commands FIM_ALGORITMO;

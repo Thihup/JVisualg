@@ -25,7 +25,7 @@ public class Main {
         try {
             CharStream charStream = CharStreams.fromStream(code, StandardCharsets.ISO_8859_1);
 
-            var lexer = new VisuAlgLexer(new LowecaseCharStream(charStream));
+            var lexer = new VisuAlgLexer(charStream);
             lexer.removeErrorListeners();
             lexer.addErrorListener(errorListener);
 

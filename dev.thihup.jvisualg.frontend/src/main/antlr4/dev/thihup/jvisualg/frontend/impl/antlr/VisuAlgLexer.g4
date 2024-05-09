@@ -1,5 +1,9 @@
 lexer grammar VisuAlgLexer;
 
+options {
+    caseInsensitive = true;
+}
+
 // Keywords
 ALGORITMO : 'algoritmo';
 INICIO : 'inicio';
@@ -99,7 +103,7 @@ RBRACK : ']';
 DOT : '.';
 
 // Identifiers
-ID : [a-zA-Z_][a-zA-Z0-9_]*;
+ID : [a-z_][a-z0-9_]*;
 
 // Comments
 COMMENT : '//' ~[\r\n]* -> skip;
