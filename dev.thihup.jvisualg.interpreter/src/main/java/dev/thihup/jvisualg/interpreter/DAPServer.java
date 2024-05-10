@@ -1,7 +1,7 @@
 package dev.thihup.jvisualg.interpreter;
 
 import dev.thihup.jvisualg.frontend.ASTResult;
-import dev.thihup.jvisualg.frontend.Main;
+import dev.thihup.jvisualg.frontend.VisualgParser;
 import dev.thihup.jvisualg.frontend.node.Location;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -60,7 +60,7 @@ public class DAPServer implements IDebugProtocolServer {
     public CompletableFuture<Void> launch(Map<String, Object> args) {
         return CompletableFuture.runAsync(() -> {
             ByteArrayInputStream source = new ByteArrayInputStream(args.get("source").toString().getBytes(StandardCharsets.ISO_8859_1));
-            ASTResult astResult = Main.buildAST(source);
+            ASTResult astResult = VisualgParser.parse(source);
 
             OutputEventArguments outputStart = new OutputEventArguments();
             outputStart.setOutput("Início da execução\n");

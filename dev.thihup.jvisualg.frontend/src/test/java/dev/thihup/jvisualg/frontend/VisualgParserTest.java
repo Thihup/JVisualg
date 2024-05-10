@@ -7,12 +7,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-class MainTest {
+class VisualgParserTest {
 
     @ParameterizedTest
     @MethodSource("examplesV25")
     void testExamplesV25(Path path) throws Throwable {
-        ASTResult astResult = Main.buildAST(Files.newInputStream(path));
+        ASTResult astResult = VisualgParser.parse(Files.newInputStream(path));
         TypeCheckerResult typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
         typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
@@ -20,7 +20,7 @@ class MainTest {
     @ParameterizedTest
     @MethodSource("examplesV30")
     void testExamplesV30(Path path) throws Throwable {
-        ASTResult astResult = Main.buildAST(Files.newInputStream(path));
+        ASTResult astResult = VisualgParser.parse(Files.newInputStream(path));
         TypeCheckerResult typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
         typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }

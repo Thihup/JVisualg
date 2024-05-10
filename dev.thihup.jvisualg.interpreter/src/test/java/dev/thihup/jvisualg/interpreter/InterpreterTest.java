@@ -1,6 +1,6 @@
 package dev.thihup.jvisualg.interpreter;
 
-import dev.thihup.jvisualg.frontend.Main;
+import dev.thihup.jvisualg.frontend.VisualgParser;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
@@ -13,7 +13,7 @@ class InterpreterTest {
     void test() {
         StringWriter stringWriter = new StringWriter();
         new Interpreter(Reader.nullReader(), stringWriter, new ReentrantLock())
-            .run(Main.buildAST(new ByteArrayInputStream("""
+            .run(VisualgParser.parse(new ByteArrayInputStream("""
                 algoritmo "Teste"
                 var
                 a: inteiro
@@ -442,7 +442,7 @@ class InterpreterTest {
         };
 
         new Interpreter(stringReader, stringWriter, new ReentrantLock())
-                .run(Main.buildAST(new ByteArrayInputStream("""
+                .run(VisualgParser.parse(new ByteArrayInputStream("""
                 algoritmo "Teste"
                 var
                 a: inteiro

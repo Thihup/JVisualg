@@ -14,13 +14,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class Main {
+public class VisualgParser {
     public static void main(String[] args) throws Throwable {
-        buildAST(Files.newInputStream(Paths.get(args[0])));
+        parse(Files.newInputStream(Paths.get(args[0])));
     }
 
 
-    public static ASTResult buildAST(InputStream code) {
+    public static ASTResult parse(InputStream code) {
         var errorListener = new BaseErrorListener();
         try {
             CharStream charStream = CharStreams.fromStream(code, StandardCharsets.ISO_8859_1);

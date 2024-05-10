@@ -97,7 +97,7 @@ public class VisualgLanguageServer implements LanguageServer, LanguageClientAwar
             }
 
             byte[] bytes = content.getBytes(StandardCharsets.ISO_8859_1);
-            ASTResult astResult = Main.buildAST(new ByteArrayInputStream(bytes));
+            ASTResult astResult = VisualgParser.parse(new ByteArrayInputStream(bytes));
 
             List<Error> errors = astResult.errors();
 
@@ -172,7 +172,7 @@ public class VisualgLanguageServer implements LanguageServer, LanguageClientAwar
     @Override
     public CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
         return CompletableFuture.supplyAsync(() -> {
-            ASTResult astResult = Main.buildAST(new ByteArrayInputStream(documentContent.get(params.getTextDocument().getUri()).getBytes(StandardCharsets.ISO_8859_1)));
+            ASTResult astResult = VisualgParser.parse(new ByteArrayInputStream(documentContent.get(params.getTextDocument().getUri()).getBytes(StandardCharsets.ISO_8859_1)));
             if (astResult.node().isEmpty()) {
                 return List.of();
             }
@@ -260,7 +260,7 @@ public class VisualgLanguageServer implements LanguageServer, LanguageClientAwar
     @Override
     public CompletableFuture<List<? extends DocumentHighlight>> documentHighlight(DocumentHighlightParams params) {
         return CompletableFuture.supplyAsync(() -> {
-            ASTResult astResult = Main.buildAST(new ByteArrayInputStream(documentContent.get(params.getTextDocument().getUri()).getBytes(StandardCharsets.ISO_8859_1)));
+            ASTResult astResult = VisualgParser.parse(new ByteArrayInputStream(documentContent.get(params.getTextDocument().getUri()).getBytes(StandardCharsets.ISO_8859_1)));
 
             Node node = astResult.node().orElseThrow();
 
