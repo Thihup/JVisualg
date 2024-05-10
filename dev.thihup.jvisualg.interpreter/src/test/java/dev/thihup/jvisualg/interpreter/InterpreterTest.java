@@ -13,7 +13,7 @@ class InterpreterTest {
     void test() {
         StringWriter stringWriter = new StringWriter();
         new Interpreter(Reader.nullReader(), stringWriter, new ReentrantLock())
-            .run(VisualgParser.parse(new ByteArrayInputStream("""
+            .run(VisualgParser.parse("""
                 algoritmo "Teste"
                 var
                 a: inteiro
@@ -73,7 +73,7 @@ class InterpreterTest {
                 escreval(falso)
                 escreval(a)
                 fimalgoritmo
-                """.getBytes())).node().get());
+                """).node().get());
         assertEquals(
                         """
                         Hello, World! 5
@@ -442,7 +442,7 @@ class InterpreterTest {
         };
 
         new Interpreter(stringReader, stringWriter, new ReentrantLock())
-                .run(VisualgParser.parse(new ByteArrayInputStream("""
+                .run(VisualgParser.parse("""
                 algoritmo "Teste"
                 var
                 a: inteiro
@@ -451,7 +451,7 @@ class InterpreterTest {
                     leia(a)
                     escreval(a)
                 fimalgoritmo
-                """.getBytes())).node().get());
+                """).node().get());
         assertEquals(
                 """
                 Number: 5

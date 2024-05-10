@@ -6,6 +6,7 @@ import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
 import org.antlr.v4.runtime.*;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -20,6 +21,9 @@ public class VisualgParser {
     }
 
 
+    public static ASTResult parse(String code) {
+        return parse(new ByteArrayInputStream(code.getBytes(StandardCharsets.ISO_8859_1)));
+    }
     public static ASTResult parse(InputStream code) {
         var errorListener = new BaseErrorListener();
         try {
