@@ -9,6 +9,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -71,7 +72,14 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitProcedureDeclaration(VisuAlgParser.ProcedureDeclarationContext ctx) {
-        CompundNode parameters = ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context ? context.formalParameter().stream().map(this::visit).collect(toCompundNode(fromRuleContext(context))) : CompundNode.EMPTY;
+        CompundNode parameters;
+        if (ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context) {
+            parameters = context.formalParameter().stream().map(this::visit).mapMulti((Node a, Consumer<Node> b) -> {
+                ((CompundNode)a).nodes().forEach(b);
+            }).collect(toCompundNode(fromRuleContext(context)));
+        } else {
+            parameters = CompundNode.EMPTY;
+        }
         CompundNode declarations = ctx.declarations() instanceof VisuAlgParser.DeclarationsContext context ? context.variableDeclaration().stream().map(this::visit).collect(toCompundNode(fromRuleContext(context))) : CompundNode.EMPTY;
         CompundNode commands = ctx.commands() instanceof VisuAlgParser.CommandsContext context ? context.command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(context))) : CompundNode.EMPTY;
         return new ProcedureDeclarationNode(
@@ -86,7 +94,14 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitFunctionDeclaration(VisuAlgParser.FunctionDeclarationContext ctx) {
-        CompundNode parameters = ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context ? context.formalParameter().stream().map(this::visit).collect(toCompundNode(fromRuleContext(context))) : CompundNode.EMPTY;
+        CompundNode parameters;
+        if (ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context) {
+            parameters = context.formalParameter().stream().map(this::visit).mapMulti((Node a, Consumer<Node> b) -> {
+                ((CompundNode)a).nodes().forEach(b);
+            }).collect(toCompundNode(fromRuleContext(context)));
+        } else {
+            parameters = CompundNode.EMPTY;
+        }
         CompundNode declarations = ctx.declarations() instanceof VisuAlgParser.DeclarationsContext context ? context.variableDeclaration().stream().map(this::visit).collect(toCompundNode(fromRuleContext(context))) : CompundNode.EMPTY;
         CompundNode commands = ctx.commands() instanceof VisuAlgParser.CommandsContext context ? context.command().stream().map(this::visit).collect(toCompundNode(fromRuleContext(context))) : CompundNode.EMPTY;
         return new FunctionDeclarationNode(
@@ -124,7 +139,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     public Node visitConstantsDeclaration(VisuAlgParser.ConstantsDeclarationContext ctx) {
         List<Node> constants = new ArrayList<>();
         for (int i = 0; i < ctx.ID().size(); i++) {
-            constants.add(new ConstantNode(visitId(ctx.ID(i)), visit(ctx.expr(i)), fromRuleContext(ctx.expr(i))));
+            constants.add(new ConstantNode(visitId(ctx.ID(i)), visitExpr(ctx.expr(i)), fromRuleContext(ctx.expr(i))));
         }
         return new CompundNode(constants, fromRuleContext(ctx));
     }

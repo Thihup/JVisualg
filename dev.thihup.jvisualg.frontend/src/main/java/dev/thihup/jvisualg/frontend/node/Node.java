@@ -200,7 +200,7 @@ public sealed interface Node {
         }
     }
 
-    record ConstantNode(IdNode name, Node value, Optional<Location> location) implements Node {
+    record ConstantNode(IdNode name, ExpressionNode value, Optional<Location> location) implements Node {
         public ConstantNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
@@ -285,6 +285,10 @@ public sealed interface Node {
         public IdNode {
             Objects.requireNonNull(id);
             Objects.requireNonNull(location);
+        }
+        @Override
+        public String id() {
+            return id.toLowerCase();
         }
     }
 
