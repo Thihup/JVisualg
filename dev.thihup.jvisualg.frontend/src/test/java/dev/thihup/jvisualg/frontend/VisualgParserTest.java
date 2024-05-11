@@ -1,13 +1,13 @@
 package dev.thihup.jvisualg.frontend;
 
+import dev.thihup.jvisualg.examples.ExamplesBase;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.stream.Stream;
 
-class VisualgParserTest {
+class VisualgParserTest extends ExamplesBase {
 
     @ParameterizedTest
     @MethodSource("examplesV25")
@@ -25,17 +25,6 @@ class VisualgParserTest {
         typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
     }
 
-    static Stream<Path> examplesV25() throws Throwable {
-        return examples("v25");
-    }
 
-    static Stream<Path> examplesV30() throws Throwable {
-        return examples("v30");
-    }
-
-    static Stream<Path> examples(String folder) throws Throwable {
-        return Files.walk(Path.of("src", "test", "resources", "examples", folder))
-                .filter(Files::isRegularFile);
-    }
 
 }

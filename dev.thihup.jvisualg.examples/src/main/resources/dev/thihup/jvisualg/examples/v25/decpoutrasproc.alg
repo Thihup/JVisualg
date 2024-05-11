@@ -13,10 +13,10 @@ Var
 
 procedimento leropcao
 inicio
-   repita
+   //repita
       escreva("Escolha uma base : ")
       leia(opcao)
-   ate (Opcao = "F") ou (Opcao="B") ou (Opcao="O") ou (Opcao="H")
+   //ate (Opcao = "F") ou (Opcao="B") ou (Opcao="O") ou (Opcao="H")
 fimprocedimento
 
 procedimento menu
@@ -37,7 +37,7 @@ fimprocedimento
 
 inicio
 // Seção de Comandos
-repita
+//repita
    menu
    escolha Opcao
    caso "B"
@@ -49,6 +49,6 @@ repita
       leia(res)
       limpatela
    fimse
-ate Opcao = "F"
+//ate Opcao = "F"
 
 fimalgoritmo

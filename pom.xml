@@ -14,6 +14,7 @@
         <module>dev.thihup.jvisualg.lsp</module>
         <module>dev.thihup.jvisualg.ide</module>
         <module>dev.thihup.jvisualg.interpreter</module>
+        <module>dev.thihup.jvisualg.examples</module>
     </modules>
 
     <properties>
