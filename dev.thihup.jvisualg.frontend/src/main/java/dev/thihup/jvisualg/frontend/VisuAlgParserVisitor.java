@@ -407,7 +407,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
             case ">=" -> new GeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             case "<>" -> new NeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             case "%", "mod" -> new ModNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
-            case "pot" -> new PowNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "^" -> new PowNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             default -> throw new UnsupportedOperationException(text + " -> " + ctx.getParent().getText());
         };
     }
