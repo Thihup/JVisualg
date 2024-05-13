@@ -118,7 +118,7 @@ public class Interpreter {
             case Node.ReadCommandNode readCommandNode -> runReadCommand(readCommandNode);
             case Node.ReturnNode returnNode -> {
                 stack.element().put("(RESULTADO)", evaluate(returnNode.expr()));
-                throw new BreakException();
+                throw new ReturnException();
             }
             case Node.TimerCommandNode timerCommandNode -> {}
             case Node.WhileCommandNode whileCommandNode -> runWhileCommand(whileCommandNode);
@@ -128,6 +128,13 @@ public class Interpreter {
     }
 
     private static class BreakException extends RuntimeException {
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
+        }
+    }
+
+    private static class ReturnException extends RuntimeException {
         @Override
         public synchronized Throwable fillInStackTrace() {
             return this;
@@ -230,6 +237,7 @@ public class Interpreter {
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
                     }
+
                     stack.element().put(idNode.id(), value);
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
@@ -352,6 +360,7 @@ public class Interpreter {
             case null -> "NULL??!!";
             default -> throw new UnsupportedOperationException("Unsupported type: " + value.getClass());
         });
+
     }
 
     private Object evaluate(Node.ExpressionNode node){
@@ -410,7 +419,10 @@ public class Interpreter {
                 stack.element().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate((Node.ExpressionNode) arguments.get(i)));
             }
             run(functionDeclaration.declarations());
-            run(functionDeclaration.commands());
+            try {
+                run(functionDeclaration.commands());
+            } catch (ReturnException _) {
+            }
             Object result = stack.element().get("(RESULTADO)");
             stack.pop();
             return result;
@@ -684,4 +696,5 @@ public class Interpreter {
     public void addBreakpoint(Location location) {
         breakpointLocations.add(location);
     }
+
 }
