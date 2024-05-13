@@ -14,10 +14,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.*;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import org.eclipse.lsp4j.*;
@@ -44,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -61,12 +59,17 @@ public class Main extends Application {
     @FXML
     private TextArea outputArea;
 
+    @FXML
+    private TableView<DebugState> debugArea;
+
     private Subscription subscribe;
     private Launcher<LanguageServer> clientLauncher;
     private Future<Void> lspServer;
     private Future<Void> lspClient;
     private List<Diagnostic> diagnostics;
     private Interpreter interpreter;
+
+    public record DebugState(String getEscopo, String getNome, String getTipo, String getValor){}
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -89,12 +92,41 @@ public class Main extends Application {
         runButton.addEventHandler(ActionEvent.ACTION, _ -> {
             Platform.runLater(() -> {
                 outputArea.clear();
+                debugArea.getItems().clear();
                 outputArea.appendText("Início da execução\n");
+                interpreter.reset();
+
 
                 interpreter.run(codeArea.getText(), executor)
-                    .thenRun(() -> appendOutput("\nFim da execução."))
+                    .thenRun(() -> {
+                        Platform.runLater(() -> interpreter.stack.stream()
+                            .flatMap(x -> x.entrySet().stream())
+                            .mapMulti((Map.Entry<String, Object>value, Consumer<DebugState> consumer) -> {
+                                switch (value.getValue()) {
+                                    case Object[][] multiObjects -> {
+                                        for (int i = 0; i < multiObjects.length; i++) {
+                                            Object[] objects = multiObjects[i];
+                                            for (int j = 0; j < objects.length; j++) {
+                                                Object object = objects[j];
+                                                consumer.accept(new DebugState("", value.getKey()+ "["+i+", "+j+"]", object.getClass().getSimpleName(), object.toString()));
+                                            }
+                                        }
+                                    }
+                                    case Object[] objects -> {
+                                        for (int i = 0; i < objects.length; i++) {
+                                            Object object = objects[i];
+                                            consumer.accept(new DebugState("", value.getKey()+ "["+i+"]", object.getClass().getSimpleName(), object.toString()));
+                                        }
+                                    }
+                                    case Object _ -> consumer.accept(new DebugState("", value.getKey(), value.getValue().getClass().getSimpleName(), value.getValue().toString()));
+                                }
+
+                            })
+                            .forEach(x -> debugArea.getItems().add(x)));
+                        appendOutput("\nFim da execução.");
+                    })
                     .exceptionally(e -> {
-                        e.printStackTrace();
+                        appendOutput(e.toString());
                         appendOutput("\nExecução terminada por erro.");
                         return null;
                     });
@@ -160,9 +192,9 @@ public class Main extends Application {
                 // Data : %s
                 // Seção de Declarações
                 var
-                x:inteiro
+                
                 inicio
-                leia(x)
+                
                 fimalgoritmo
                 """.formatted(LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
     }

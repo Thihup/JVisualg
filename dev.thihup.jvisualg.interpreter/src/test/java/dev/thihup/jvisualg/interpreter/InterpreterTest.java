@@ -434,7 +434,7 @@ class InterpreterTest extends ExamplesBase {
     @Test
     void testRead() {
         StringWriter stringWriter = new StringWriter();
-        new Interpreter(new IO(_ -> new InputValue.InteiroValue(5), stringWriter::write))
+        new Interpreter(new IO(_ -> CompletableFuture.completedFuture(new InputValue.InteiroValue(5)), stringWriter::write))
                 .run(VisualgParser.parse("""
                 algoritmo "Teste"
                 var
@@ -456,25 +456,23 @@ class InterpreterTest extends ExamplesBase {
     @MethodSource({"examplesV25", "examplesV30"})
     void testExamples(Path path) throws Throwable {
         ASTResult astResult = VisualgParser.parse(Files.newInputStream(path));
-        StringWriter output = new StringWriter();
 
         RandomGenerator aDefault = RandomGenerator.getDefault();
 
         IO io = new IO(
-            inputRequest -> switch (inputRequest.type()) {
+            inputRequest -> CompletableFuture.completedFuture(switch (inputRequest.type()) {
                 case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(100));
                 case REAL -> new InputValue.RealValue(aDefault.nextDouble(100));
                 case LOGICO -> new InputValue.LogicoValue(aDefault.nextBoolean());
                 case CARACTER ->  new InputValue.CaracterValue(aDefault.ints(65, 91)
                         .limit(5)
                         .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
-            }
-        , output::write);
+            })
+        , System.out::println);
 
         CompletableFuture.runAsync(() -> {
             Interpreter interpreter = new Interpreter(io);
             interpreter.run(astResult.node().get());
         }).get(3, TimeUnit.SECONDS);
-        System.out.println(output);
     }
 }

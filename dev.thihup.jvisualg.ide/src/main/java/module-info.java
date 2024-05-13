@@ -10,5 +10,5 @@ module dev.thihup.jvisualg.ide {
 
     exports dev.thihup.jvisualg.ide to javafx.graphics;
 
-    opens dev.thihup.jvisualg.ide to javafx.fxml;
+    opens dev.thihup.jvisualg.ide to javafx.fxml, javafx.base;
 }
