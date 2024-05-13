@@ -1,5 +1,6 @@
 package dev.thihup.jvisualg.interpreter;
 
+import dev.thihup.jvisualg.frontend.VisualgParser;
 import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
 
@@ -8,6 +9,8 @@ import java.lang.reflect.Array;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.random.RandomGenerator;
 
 public class Interpreter {
@@ -22,8 +25,12 @@ public class Interpreter {
     private boolean eco = true;
 
 
-    Interpreter(IO io) {
+    public Interpreter(IO io) {
         this.io = io;
+    }
+
+    public CompletableFuture<Void> run(String code, ExecutorService executorService) {
+        return CompletableFuture.runAsync(() -> run(VisualgParser.parse(code).node().get()), executorService);
     }
 
     public void run(Node node) {
@@ -205,7 +212,7 @@ public class Interpreter {
             switch (expr) {
                 case Node.IdNode idNode -> {
                     Object o = getVariableFromStack(idNode);
-                    final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass())));
+                    final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass()))).join();
                     Object value = switch (o) {
                         case Boolean _ when aleatorio -> random.nextBoolean();
                         case String _ when aleatorio -> random.ints(65, 91)
@@ -234,13 +241,13 @@ public class Interpreter {
                     switch(indexes.nodes().size()) {
                         case 1 -> {
                             int index = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
-                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType())));
+                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType()))).join();
                             Array.set(o, index, readValueForArray(o, inputValue));
                         }
                         case 2 -> {
                             int index1 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
                             int index2 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getLast())).intValue();
-                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index1 + "][" + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType())));
+                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index1 + "][" + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType()))).join();
                             Array.set(Array.get(o, index1), index2, readValueForArray(Array.get(o, index1), inputValue));
                         }
                         default -> throw new UnsupportedOperationException("Unsupported number of indexes: " + indexes.nodes().size());
@@ -596,6 +603,7 @@ public class Interpreter {
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean _, Number y) -> y;
                     case PairValue(Number _, Boolean y) -> y;
+                    case PairValue(String x, String y) -> x.equalsIgnoreCase(y);
                     case PairValue(Object x, Object y) -> x.equals(y);
                     case Object o -> throw new UnsupportedOperationException("unsupported eq node types: " + o);
                 };
@@ -608,6 +616,7 @@ public class Interpreter {
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean _, Number y) -> y;
                     case PairValue(Number _, Boolean y) -> y;
+                    case PairValue(String x, String y) -> !x.equalsIgnoreCase(y);
                     case PairValue(Object x, Object y) -> !x.equals(y);
                     case Object o -> throw new UnsupportedOperationException("unsupported ne node types: " + o);
                 };

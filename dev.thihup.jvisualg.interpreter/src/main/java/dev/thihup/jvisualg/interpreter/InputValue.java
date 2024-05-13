@@ -1,6 +1,6 @@
 package dev.thihup.jvisualg.interpreter;
 
-sealed interface InputValue {
+public sealed interface InputValue {
     record InteiroValue(int value) implements InputValue {
     }
 

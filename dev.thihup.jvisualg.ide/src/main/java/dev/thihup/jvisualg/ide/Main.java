@@ -1,9 +1,14 @@
 package dev.thihup.jvisualg.ide;
 
+import dev.thihup.jvisualg.interpreter.IO;
+import dev.thihup.jvisualg.interpreter.InputRequestValue;
+import dev.thihup.jvisualg.interpreter.InputValue;
+import dev.thihup.jvisualg.interpreter.Interpreter;
 import dev.thihup.jvisualg.lsp.VisualgLauncher;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
@@ -12,6 +17,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputDialog;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import org.eclipse.lsp4j.*;
@@ -60,6 +66,7 @@ public class Main extends Application {
     private Future<Void> lspServer;
     private Future<Void> lspClient;
     private List<Diagnostic> diagnostics;
+    private Interpreter interpreter;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -77,9 +84,21 @@ public class Main extends Application {
 
         setupLSP();
 
-        runButton.addEventHandler(javafx.event.ActionEvent.ACTION, e -> {
+        interpreter = new Interpreter(new IO(this::readVariable, this::appendOutput));
+
+        runButton.addEventHandler(ActionEvent.ACTION, _ -> {
             Platform.runLater(() -> {
                 outputArea.clear();
+                outputArea.appendText("Início da execução\n");
+
+                interpreter.run(codeArea.getText(), executor)
+                    .thenRun(() -> appendOutput("\nFim da execução."))
+                    .exceptionally(e -> {
+                        e.printStackTrace();
+                        appendOutput("\nExecução terminada por erro.");
+                        return null;
+                    });
+
             });
         });
 
@@ -88,6 +107,35 @@ public class Main extends Application {
 
         if (Boolean.getBoolean("autoClose"))
             Platform.runLater(stage::close);
+    }
+
+    private void appendOutput(String output) {
+        Platform.runLater(() -> outputArea.appendText(output));
+    }
+
+    private CompletableFuture<InputValue> readVariable(InputRequestValue request) {
+        CompletableFuture<InputValue> inputValueCompletableFuture = new CompletableFuture<>();
+
+        Platform.runLater(() -> {
+            TextInputDialog textInputDialog = new TextInputDialog();
+            textInputDialog.setContentText("Digite um valor " + request.type() + "  para a variável " + request.variableName());
+            textInputDialog.showAndWait()
+                    .flatMap(textValue -> {
+                        try {
+                            return Optional.<InputValue>of(switch (request.type()) {
+                                case CARACTER -> new InputValue.CaracterValue(textValue);
+                                case LOGICO -> new InputValue.LogicoValue(Boolean.parseBoolean(textValue));
+                                case REAL -> new InputValue.RealValue(Double.parseDouble(textValue));
+                                case INTEIRO -> new InputValue.InteiroValue(Integer.parseInt(textValue));
+                            });
+                        } catch (Exception e) {
+                            return Optional.empty();
+                        }
+                    }).ifPresentOrElse(inputValueCompletableFuture::complete,
+                            () -> inputValueCompletableFuture.complete(null));
+        });
+
+        return inputValueCompletableFuture;
     }
 
     private void showScene(Stage stage, Parent root) {

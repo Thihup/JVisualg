@@ -1,7 +1,7 @@
 package dev.thihup.jvisualg.interpreter;
 
 public record InputRequestValue(String variableName, Type type) {
-    enum Type {
+    public enum Type {
         CARACTER, LOGICO, REAL, INTEIRO;
 
         public static Type fromClass(Class<?> classType) {
