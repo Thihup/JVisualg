@@ -99,7 +99,7 @@ public class StandardFunctions {
         return c.length();
     }
     private static String copia(String c, int p, Integer n) {
-        return c.substring(p, p + n);
+        return c.substring(p, p + n - 1);
     }
     private static String maiusc(String c) {
         return c.toUpperCase();
