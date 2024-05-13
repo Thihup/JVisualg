@@ -1,7 +1,5 @@
 package dev.thihup.jvisualg.ide;
 
-import dev.thihup.jvisualg.interpreter.DAPServer;
-import dev.thihup.jvisualg.interpreter.DebugProtocolClientExtension;
 import dev.thihup.jvisualg.lsp.VisualgLauncher;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -17,12 +15,7 @@ import javafx.scene.control.TextArea;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.debug.InitializeRequestArguments;
-import org.eclipse.lsp4j.debug.OutputEventArguments;
-import org.eclipse.lsp4j.debug.launch.DSPLauncher;
-import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
-import org.eclipse.lsp4j.jsonrpc.debug.DebugLauncher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -66,10 +59,6 @@ public class Main extends Application {
     private Launcher<LanguageServer> clientLauncher;
     private Future<Void> lspServer;
     private Future<Void> lspClient;
-    private Launcher<DebugProtocolClientExtension> dapServerLauncher;
-    private Launcher<IDebugProtocolServer> dapClientLauncher;
-    private Future<Void> dapServerListener;
-    private Future<Void> dapClientListener;
     private List<Diagnostic> diagnostics;
 
     @Override
@@ -88,12 +77,9 @@ public class Main extends Application {
 
         setupLSP();
 
-        setupDAP();
-
         runButton.addEventHandler(javafx.event.ActionEvent.ACTION, e -> {
             Platform.runLater(() -> {
                 outputArea.clear();
-                dapClientLauncher.getRemoteProxy().launch(Map.of("source", codeArea.getText()));
             });
         });
 
@@ -126,9 +112,9 @@ public class Main extends Application {
                 // Data : %s
                 // Seção de Declarações
                 var
-
+                x:inteiro
                 inicio
-                // Seção de Comandos
+                leia(x)
                 fimalgoritmo
                 """.formatted(LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
     }
@@ -158,21 +144,6 @@ public class Main extends Application {
         clientLauncher = LSPLauncher.createClientLauncher(new VisualgLanguageClient(), Channels.newInputStream(serverToClientPipe.source()), Channels.newOutputStream(clientToServerPipe.sink()), executor, null);
 
         lspClient = clientLauncher.startListening();
-    }
-
-    private void setupDAP() throws IOException {
-        Pipe clientToServerPipe = Pipe.open();
-        Pipe serverToClientPipe = Pipe.open();
-
-        DAPServer server = new DAPServer();
-        dapServerLauncher = DebugLauncher.createLauncher(server, DebugProtocolClientExtension.class,
-            Channels.newInputStream(clientToServerPipe.source()), Channels.newOutputStream(serverToClientPipe.sink()), executor, null);
-        server.connect(dapServerLauncher.getRemoteProxy());
-        dapServerListener = dapServerLauncher.startListening();
-
-        dapClientLauncher = DSPLauncher.createClientLauncher(new DAPClient(), Channels.newInputStream(serverToClientPipe.source()), Channels.newOutputStream(clientToServerPipe.sink()), executor, null);
-        dapClientListener = dapClientLauncher.startListening();
-        dapClientLauncher.getRemoteProxy().initialize(new InitializeRequestArguments());
     }
 
     private void setupErrorPopup() {
@@ -262,13 +233,6 @@ public class Main extends Application {
         if (lspServer != null) {
             lspServer.cancel(true);
         }
-        if (dapClientListener != null) {
-            dapClientListener.cancel(true);
-        }
-        if (dapServerListener != null) {
-            dapServerListener.cancel(true);
-        }
-
         fxClientExecutor.shutdown();
         executor.shutdown();
     }
@@ -368,17 +332,5 @@ public class Main extends Application {
         }
         spansBuilder.add(List.of(), text.length() - lastKwEnd);
         return spansBuilder.create();
-    }
-
-    private class DAPClient implements DebugProtocolClientExtension {
-        @Override
-        public void output(OutputEventArguments args) {
-            Platform.runLater(() -> outputArea.appendText(args.getOutput()));
-        }
-
-        @Override
-        public CompletableFuture<String> input() {
-            return CompletableFuture.completedFuture("SIMPLE TEXT");
-        }
     }
 }

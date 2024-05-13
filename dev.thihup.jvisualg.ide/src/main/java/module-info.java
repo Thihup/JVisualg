@@ -7,8 +7,6 @@ module dev.thihup.jvisualg.ide {
     requires org.eclipse.lsp4j;
     requires org.eclipse.lsp4j.jsonrpc;
     requires dev.thihup.jvisualg.interpreter;
-    requires org.eclipse.lsp4j.debug;
-    requires org.eclipse.lsp4j.jsonrpc.debug;
 
     exports dev.thihup.jvisualg.ide to javafx.graphics;
 
