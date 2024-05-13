@@ -18,6 +18,7 @@
         <native.maven.plugin.version>0.9.12</native.maven.plugin.version>
         <imageName>JVisualG</imageName>
         <javafx.version>22</javafx.version>
+        <autoClose>false</autoClose>
     </properties>
 
     <dependencies>
@@ -57,7 +58,7 @@
                 <configuration>
                     <mainClass>${mainClass}</mainClass>
                     <options>
-                        <option>-DautoClose=true</option>
+                        <option>-DautoClose=${autoClose}</option>
                         <option>--add-exports=javafx.graphics/com.sun.javafx.scene.layout=ALL-UNNAMED</option>
                         <option>--add-exports=javafx.graphics/com.sun.javafx.util=ALL-UNNAMED</option>
                         <option>--add-exports=javafx.graphics/com.sun.javafx.application=ALL-UNNAMED</option>

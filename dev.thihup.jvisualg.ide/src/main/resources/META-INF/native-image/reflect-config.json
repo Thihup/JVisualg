@@ -3,6 +3,9 @@
   "name":"[D"
 },
 {
+  "name":"[Ljava.lang.Integer;"
+},
+{
   "name":"[Ljava.lang.String;"
 },
 {
@@ -113,6 +116,10 @@
   "queryAllDeclaredMethods":true
 },
 {
+  "name":"dev.thihup.jvisualg.ide.Main$DebugState",
+  "methods":[{"name":"escopoProperty","parameterTypes":[] }, {"name":"getEscopo","parameterTypes":[] }, {"name":"getNome","parameterTypes":[] }, {"name":"getTipo","parameterTypes":[] }, {"name":"getValor","parameterTypes":[] }, {"name":"nomeProperty","parameterTypes":[] }, {"name":"setEscopo","parameterTypes":["java.lang.String"] }, {"name":"setNome","parameterTypes":["java.lang.String"] }, {"name":"setTipo","parameterTypes":["java.lang.String"] }, {"name":"setValor","parameterTypes":["java.lang.String"] }, {"name":"tipoProperty","parameterTypes":[] }, {"name":"valorProperty","parameterTypes":[] }]
+},
+{
   "name":"dev.thihup.jvisualg.ide.Main$VisualgLanguageClient",
   "queryAllDeclaredMethods":true
 },
@@ -164,6 +171,9 @@
 {
   "name":"java.nio.ByteOrder",
   "methods":[{"name":"nativeOrder","parameterTypes":[] }]
+},
+{
+  "name":"java.security.SecureRandomParameters"
 },
 {
   "name":"java.sql.Date"
@@ -275,7 +285,7 @@
   "name":"javafx.scene.control.TableColumn",
   "queryAllDeclaredMethods":true,
   "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setCellValueFactory","parameterTypes":["javafx.util.Callback"] }]
 },
 {
   "name":"javafx.scene.control.TableColumnBase",
@@ -305,10 +315,22 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getItems","parameterTypes":[] }]
 },
 {
+  "name":"javafx.scene.control.cell.PropertyValueFactory",
+  "queryAllPublicMethods":true,
+  "queryAllPublicConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
   "name":"javafx.scene.effect.Effect"
 },
 {
   "name":"javafx.scene.image.Image"
+},
+{
+  "name":"javafx.scene.image.ImageView"
+},
+{
+  "name":"javafx.scene.input.Clipboard"
 },
 {
   "name":"javafx.scene.layout.AnchorPane",
@@ -597,7 +619,15 @@
   "fields":[{"name":"theUnsafe"}]
 },
 {
+  "name":"sun.security.provider.DRBG",
+  "methods":[{"name":"<init>","parameterTypes":["java.security.SecureRandomParameters"] }]
+},
+{
   "name":"sun.security.provider.MD5",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.SHA",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
