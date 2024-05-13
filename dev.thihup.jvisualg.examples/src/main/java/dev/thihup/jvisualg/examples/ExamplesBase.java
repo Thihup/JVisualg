@@ -1,7 +1,11 @@
 package dev.thihup.jvisualg.examples;
 
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.stream.Stream;
 
 public class ExamplesBase {
@@ -15,8 +19,14 @@ public class ExamplesBase {
     }
 
     public static Stream<Path> examples(String folder) throws Throwable {
-        return Files.walk(Path.of(ExamplesBase.class.getResource(folder).toURI()))
-                .filter(Files::isRegularFile);
+        URI start = ExamplesBase.class.getResource(folder).toURI();
+        try {
+            FileSystem fileSystem = FileSystems.newFileSystem(start, Map.of());
+            return Files.walk(fileSystem.getPath("/"));
+        } catch (Exception e) {
+            return Files.walk(Path.of(start))
+                    .filter(Files::isRegularFile);
+        }
     }
 
 }
