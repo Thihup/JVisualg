@@ -8,7 +8,6 @@ import java.lang.reflect.Array;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.*;
-import java.util.concurrent.locks.Lock;
 import java.util.random.RandomGenerator;
 
 public class Interpreter {
@@ -17,33 +16,18 @@ public class Interpreter {
     private final Map<String, Node.FunctionDeclarationNode> functions = new LinkedHashMap<>();
     private final Map<String, Node.ProcedureDeclarationNode> procedures = new LinkedHashMap<>();
     private final RandomGenerator random = RandomGenerator.getDefault();
-    private final Reader originalInput;
-    private final Writer output;
-    private final Lock lock;
-    private boolean running = true;
-    private Scanner input;
-    private boolean aleatorio = true;
+    private final IO io;
+
+    private boolean aleatorio;
     private boolean eco = true;
 
-    private List<Location> breakpointLocations = new ArrayList<>();
 
-    Interpreter(Reader input, Writer output, Lock debuggerLock) {
-        this.originalInput = input;
-        this.input = new Scanner(input);
-        this.output = output;
-        this.lock = debuggerLock;
+    Interpreter(IO io) {
+        this.io = io;
     }
 
     public void run(Node node) {
-        if (!running) {
-            return;
-        }
         try {
-            if (breakpointLocations.stream()
-                    .anyMatch(location -> location.isInside(node.location().orElse(Location.EMPTY)))) {
-                lock.lock();
-            }
-
             switch (node) {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
                 case Node.ArrayTypeNode arrayTypeNode -> throw new UnsupportedOperationException("ArrayTypeNode not implemented");
@@ -59,7 +43,7 @@ public class Interpreter {
                 case Node.ExpressionNode e -> evaluate(e);
             }
         } catch (InterruptedException | IOException _) {
-            running = false;
+
         }
     }
 
@@ -86,14 +70,14 @@ public class Interpreter {
             case Node.ChooseCaseNode chooseCaseNode -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
             case Node.ChooseCommandNode chooseCommandNode -> throw new UnsupportedOperationException("ChooseCommandNode not implemented");
             case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
-            case Node.CronometroCommandNode cronometroCommandNode -> throw new UnsupportedOperationException("CronometroCommandNode not implemented");
+            case Node.CronometroCommandNode cronometroCommandNode -> {}
             case Node.DebugCommandNode debugCommandNode -> throw new UnsupportedOperationException("DebugCommandNode not implemented");
             case Node.EcoCommandNode ecoCommandNode -> eco = ecoCommandNode.on();
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
             case Node.IncrementNode incrementNode -> throw new UnsupportedOperationException("IncrementNode not implemented");
             case Node.InterrompaCommandNode interrompaCommandNode -> runInterrompaCommand(interrompaCommandNode);
             case Node.LimpatelaCommandNode limpatelaCommandNode -> {}
-            case Node.PausaCommandNode pausaCommandNode -> throw new UnsupportedOperationException("PausaCommandNode not implemented");
+            case Node.PausaCommandNode pausaCommandNode -> {}
             case Node.ProcedureCallNode procedureCallNode -> {
                 Node.ProcedureDeclarationNode procedureDeclaration = procedures.get(procedureCallNode.name().id());
                 if (procedureDeclaration != null) {
@@ -146,22 +130,28 @@ public class Interpreter {
     }
 
     private void runAssignment(Node.AssignmentNode assignmentNode) {
+        Object evaluate = evaluate(assignmentNode.expr());
         switch (assignmentNode.idOrArray()) {
-            case Node.IdNode idNode -> stack.element().put(idNode.id(), evaluate(assignmentNode.expr()));
+            case Node.IdNode idNode -> stack.element().put(idNode.id(), evaluate);
             case Node.ArrayAccessNode arrayAccessNode -> {
                 Node node = arrayAccessNode.node();
                 Object o = getVariableFromStack((Node.IdNode) node);
-
                 Node.CompundNode indexes = arrayAccessNode.indexes();
                 switch(indexes.nodes().size()) {
                     case 1 -> {
                         int index = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
-                        Array.set(o, index, evaluate(assignmentNode.expr()));
+                        if (o instanceof Double[] && evaluate instanceof Integer i)
+                            evaluate = i.doubleValue();
+                        Array.set(o, index, evaluate);
                     }
                     case 2 -> {
                         int index1 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
                         int index2 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getLast())).intValue();
-                        Array.set(Array.get(o, index1), index2, evaluate(assignmentNode.expr()));
+                        Object array = Array.get(o, index1);
+                        if (array instanceof Double[] && evaluate instanceof Integer i)
+                            evaluate = i.doubleValue();
+
+                        Array.set(array, index2, evaluate);
                     }
                     default -> throw new UnsupportedOperationException("Unsupported number of indexes: " + indexes.nodes().size());
                 }
@@ -178,9 +168,8 @@ public class Interpreter {
     private void runWriteCommandNode(Node.WriteCommandNode writeCommandNode) throws IOException {
         run(writeCommandNode.writeList());
         if (writeCommandNode.newLine()) {
-            output.write("\n");
+            io.output().accept("\n");
         }
-        output.flush();
     }
 
     private void runWhileCommand(Node.WhileCommandNode whileCommandNode) {
@@ -213,10 +202,10 @@ public class Interpreter {
     private void runReadCommand(Node.ReadCommandNode readCommandNode) throws IOException {
 
         readCommandNode.exprList().nodes().forEach(expr -> {
-
             switch (expr) {
                 case Node.IdNode idNode -> {
                     Object o = getVariableFromStack(idNode);
+                    final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass())));
                     Object value = switch (o) {
                         case Boolean _ when aleatorio -> random.nextBoolean();
                         case String _ when aleatorio -> random.ints(65, 91)
@@ -225,61 +214,34 @@ public class Interpreter {
                         case Double _ when aleatorio -> random.nextDouble(100);
                         case Integer _ when aleatorio -> random.nextInt(100);
 
-                        case Integer _ when input.hasNextInt() -> input.nextInt();
-                        case Double _ when input.hasNextDouble() -> input.nextDouble();
-                        case String _ when input.hasNext() -> input.next();
-                        case Boolean _ when input.hasNextBoolean() -> input.nextBoolean();
+                        case Integer _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
+                        case Double _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
+                        case String _ when inputValue instanceof InputValue.CaracterValue(var value1) -> value1;
+                        case Boolean _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
 
                         default -> throw new UnsupportedOperationException("Unsupported type: " + o.getClass());
                     };
-                    try {
-                        output.write(value + "\n");
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-
+                    if (eco)
+                        io.output().accept(value + "\n");
+                    
                     stack.element().put(idNode.id(), value);
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
-                    Node node = arrayAccessNode.node();
-                    Object o = getVariableFromStack((Node.IdNode) node);
+                    Node.IdNode node = (Node.IdNode) arrayAccessNode.node();
+                    Object o = getVariableFromStack(node);
 
                     Node.CompundNode indexes = arrayAccessNode.indexes();
                     switch(indexes.nodes().size()) {
                         case 1 -> {
                             int index = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
-                            Array.set(o, index, switch (o) {
-                                case Boolean[] _ when aleatorio -> random.nextBoolean();
-                                case String[] _ when aleatorio -> random.ints(65, 91)
-                                        .limit(5)
-                                        .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append);
-                                case Double[] _ when aleatorio -> random.nextDouble(100);
-                                case Integer[] _ when aleatorio -> random.nextInt(100);
-
-                                case Boolean[] _ when input.hasNextBoolean() -> input.nextBoolean();
-                                case String[] _ when input.hasNext() -> input.next();
-                                case Double[] _ when input.hasNextDouble() -> input.nextDouble();
-                                case Integer[] _ when input.hasNextInt() -> input.nextInt();
-                                default -> throw new UnsupportedOperationException("Unsupported type: " + o.getClass());
-                            });
+                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType())));
+                            Array.set(o, index, readValueForArray(o, inputValue));
                         }
                         case 2 -> {
                             int index1 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
                             int index2 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getLast())).intValue();
-                            Array.set(Array.get(o, index1), index2, switch (Array.get(o, index1)) {
-                                case Boolean[] _ when aleatorio -> random.nextBoolean();
-                                case String[] _ when aleatorio -> random.ints(65, 91)
-                                        .limit(5)
-                                        .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append);
-                                case Double[] _ when aleatorio -> random.nextDouble(100);
-                                case Integer[] _ when aleatorio -> random.nextInt(100);
-
-                                case Boolean[] _ when input.hasNextBoolean() -> input.nextBoolean();
-                                case String[] _ when  input.hasNext() -> input.next();
-                                case Double[] _ when input.hasNextDouble() -> input.nextDouble();
-                                case Integer[] _ when input.hasNextInt() -> input.nextInt();
-                                default -> throw new UnsupportedOperationException("Unsupported type: " + o.getClass());
-                            });
+                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index1 + "][" + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType())));
+                            Array.set(Array.get(o, index1), index2, readValueForArray(Array.get(o, index1), inputValue));
                         }
                         default -> throw new UnsupportedOperationException("Unsupported number of indexes: " + indexes.nodes().size());
                     }
@@ -288,6 +250,26 @@ public class Interpreter {
             }
         });
 
+    }
+
+    private Object readValueForArray(Object o, InputValue inputValue) {
+        Object o1 = switch (o) {
+            case Boolean[] _ when aleatorio -> random.nextBoolean();
+            case String[] _ when aleatorio -> random.ints(65, 91)
+                    .limit(5)
+                    .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append);
+            case Double[] _ when aleatorio -> random.nextDouble(100);
+            case Integer[] _ when aleatorio -> random.nextInt(100);
+
+            case Integer[] _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
+            case Double[] _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
+            case String[] _ when inputValue instanceof InputValue.CaracterValue(var value1) -> value1;
+            case Boolean[] _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
+            default -> throw new UnsupportedOperationException("Unsupported type: " + o.getClass());
+        };
+        if (eco)
+            io.output().accept(o1.toString() + "\n");
+        return o1;
     }
 
     private Object getVariableFromStack(Node.IdNode idNode) {
@@ -306,7 +288,10 @@ public class Interpreter {
                 int i;
                 for (i = startValue; i <= endValue; i += stepValue) {
                     stack.element().put(id.id(), i);
-                    run(command);
+                    try {
+                        run(command);
+                    } catch (BreakException _) {
+                    }
                 }
                 stack.element().put(id.id(), i);
             }
@@ -338,7 +323,7 @@ public class Interpreter {
         numberFormat.setRoundingMode(RoundingMode.HALF_UP);
         numberFormat.setMaximumFractionDigits(0);
         numberFormat.setMinimumFractionDigits(0);
-        output.write(switch (value) {
+        io.output().accept(switch (value) {
             case Double doubleValue when spacesValue >= 1 && precisionValue >= 1 -> {
                 numberFormat.setMinimumFractionDigits(precisionValue);
                 numberFormat.setMaximumFractionDigits(precisionValue);
@@ -631,7 +616,6 @@ public class Interpreter {
     }
 
     public void stop() {
-        running = false;
         Thread.currentThread().interrupt();
     }
 
@@ -691,10 +675,6 @@ public class Interpreter {
             }
             default -> throw new IllegalStateException("Unexpected value: " + typeNode);
         };
-    }
-
-    public void addBreakpoint(Location location) {
-        breakpointLocations.add(location);
     }
 
 }

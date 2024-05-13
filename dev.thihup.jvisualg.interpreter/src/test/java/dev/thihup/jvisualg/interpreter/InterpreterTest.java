@@ -2,20 +2,17 @@ package dev.thihup.jvisualg.interpreter;
 
 import dev.thihup.jvisualg.examples.ExamplesBase;
 import dev.thihup.jvisualg.frontend.ASTResult;
-import dev.thihup.jvisualg.frontend.TypeChecker;
-import dev.thihup.jvisualg.frontend.TypeCheckerResult;
 import dev.thihup.jvisualg.frontend.VisualgParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.*;
-import java.nio.channels.Channels;
-import java.nio.channels.Pipe;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Stream;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.random.RandomGenerator;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,7 +20,8 @@ class InterpreterTest extends ExamplesBase {
     @Test
     void test() {
         StringWriter stringWriter = new StringWriter();
-        new Interpreter(Reader.nullReader(), stringWriter, new ReentrantLock())
+        IO io = new IO(_ -> null, stringWriter::write);
+        new Interpreter(io)
             .run(VisualgParser.parse("""
                 algoritmo "Teste"
                 var
@@ -436,24 +434,7 @@ class InterpreterTest extends ExamplesBase {
     @Test
     void testRead() {
         StringWriter stringWriter = new StringWriter();
-        StringReader stringReader = new StringReader("5\n");
-//        StringReader stringReader = new StringReader("5\n") {
-//            @Override
-//            public int read() throws IOException {
-//                int read = super.read();
-//                stringWriter.write(read);
-//                return read;
-//            }
-//
-//            @Override
-//            public int read(char[] cbuf, int off, int len) throws IOException {
-//                int read = super.read(cbuf, off, len);
-//                stringWriter.write(cbuf, off, read);
-//                return read;
-//            }
-//        };
-
-        new Interpreter(stringReader, stringWriter, new ReentrantLock())
+        new Interpreter(new IO(_ -> new InputValue.InteiroValue(5), stringWriter::write))
                 .run(VisualgParser.parse("""
                 algoritmo "Teste"
                 var
@@ -476,8 +457,24 @@ class InterpreterTest extends ExamplesBase {
     void testExamples(Path path) throws Throwable {
         ASTResult astResult = VisualgParser.parse(Files.newInputStream(path));
         StringWriter output = new StringWriter();
-        new Interpreter(new StringReader("5\n5\n5\n"), output, new ReentrantLock())
-                .run(astResult.node().get());
+
+        RandomGenerator aDefault = RandomGenerator.getDefault();
+
+        IO io = new IO(
+            inputRequest -> switch (inputRequest.type()) {
+                case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(100));
+                case REAL -> new InputValue.RealValue(aDefault.nextDouble(100));
+                case LOGICO -> new InputValue.LogicoValue(aDefault.nextBoolean());
+                case CARACTER ->  new InputValue.CaracterValue(aDefault.ints(65, 91)
+                        .limit(5)
+                        .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
+            }
+        , output::write);
+
+        CompletableFuture.runAsync(() -> {
+            Interpreter interpreter = new Interpreter(io);
+            interpreter.run(astResult.node().get());
+        }).get(3, TimeUnit.SECONDS);
         System.out.println(output);
     }
 }

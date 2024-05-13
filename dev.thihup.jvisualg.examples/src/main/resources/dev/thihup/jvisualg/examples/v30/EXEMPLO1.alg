@@ -7,7 +7,8 @@ Algoritmo "EXMPLO1"
 var
 // Seção de Declarações das variáveis 
     A,B,C,X,J,K,TEMP : INTEIRO
-    XVET : VETOR[1..3] DE CARACTER
+    XVET : VETOR[1..3] DE INTEIRO
+    test: logico
 inicio
 // Seção de Comandos, procedimento, funções, operadores, etc... 
    ESCREVAL("Digite 3 numeros inteiro!")
@@ -17,14 +18,14 @@ inicio
    LEIA(B)
    ESCREVA("Terceiro numero: ")
    LEIA(C)
-   
+
    xvet[1] := A
    xvet[2] := B
    xvet[3] := C
 
-   PARA J DE 1 ATÉ 3 FAÇA
-      PARA K DE J ATÉ 3 FAÇA
-          SE xvet[J] > xvet[K] ENTÃO
+   PARA J DE 1 ATE 3 FACA
+      PARA K DE J ATE 3 FACA
+          SE xvet[J] > xvet[K] ENTAO
              TEMP := xvet[J]
              xvet[J] := xvet[K]
              xvet[K] := TEMP
@@ -38,22 +39,22 @@ inicio
    ESCREVAL("3 - ORDEM DE ENTRADA")
    ESCREVA("Digite: ")
    LEIA(X)
-   SE X >= 1 E X <= 3 ENTÃO
-      SE X = 1 ENTÃO
+   SE (X >= 1) e (X <= 3) ENTAO
+      SE X = 1 ENTAO
          ESCREVAL("ORDEM ALFABÉTICA CRESCENTE !!!")
-         PARA J DE 1 ATÉ 3 FAÇA
+         PARA J DE 1 ATE 3 FACA
             ESCREVAL(J," VALOR ",xvet[J])
          FIMPARA
       FIMSE
 
-      SE X = 2 ENTÃO
+      SE X = 2 ENTAO
          ESCREVAL("ORDEM ALFABÉTICA DECRESCENTE !!!")
-         PARA J DE 3 ATÉ 1 PASSO -1 FAÇA
+         PARA J DE 3 ATE 1 PASSO -1 FACA
             ESCREVAL(J," VALOR ",xvet[J])
          FIMPARA
       FIMSE
 
-      SE X = 3 ENTÃO
+      SE X = 3 ENTAO
          ESCREVAL("ORDEM DE ENTRADA !!!")
          ESCREVAL(1," VALOR ",A)
          ESCREVAL(2," VALOR ",B)
