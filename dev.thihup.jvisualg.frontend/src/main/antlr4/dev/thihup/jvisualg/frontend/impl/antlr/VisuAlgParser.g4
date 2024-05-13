@@ -105,7 +105,7 @@ chooseCommand: ESCOLHA expr FACA? chooseCase* outroCase? FIMESCOLHA;
 
 // Loop commands
 loopCommand : paraCommand | enquantoCommand | repitaCommand;
-paraCommand : PARA ID DE expr ATE expr? (PASSO expr)? FACA commands FIMPARA;
+paraCommand : PARA ID (DE | ASSIGN) expr ATE expr? (PASSO expr)? FACA commands FIMPARA;
 enquantoCommand : ENQUANTO expr FACA commands FIMENQUANTO;
 repitaCommand : REPITA commands ATE expr FIMREPITA?
                | REPITA commands FIMREPITA
