@@ -28,7 +28,7 @@ public sealed interface Node {
     }
 
     default Stream<Node> visitChildren() {
-        Stream<Node> childrenNode = switch (this) {
+        Stream<? extends Node> childrenNode = switch (this) {
             case AlgoritimoNode(var literalNode, var declarations, var commands, _) ->
                     Stream.of(literalNode, declarations, commands);
             case FunctionDeclarationNode(
@@ -38,7 +38,7 @@ public sealed interface Node {
                 Stream<Node> parametersStream = parameters.nodes().stream();
                 Stream<Node> referencesStream = references.nodes().stream();
                 Stream<Node> declarationsStream = declarations.nodes().stream();
-                Stream<Node> commandsStream = commands.nodes().stream();
+                Stream<CommandNode> commandsStream = commands.nodes().stream();
                 yield Stream.of(nodeStream, parametersStream, referencesStream, declarationsStream, commandsStream).flatMap(s -> s);
             }
             case ProcedureDeclarationNode(
@@ -48,7 +48,7 @@ public sealed interface Node {
                 Stream<Node> parametersStream = parameters.nodes().stream();
                 Stream<Node> referencesStream = references.nodes().stream();
                 Stream<Node> declarationsStream = declarations.nodes().stream();
-                Stream<Node> commandsStream = commands.nodes().stream();
+                Stream<CommandNode> commandsStream = commands.nodes().stream();
                 yield Stream.of(nodeStream, parametersStream, referencesStream, declarationsStream, commandsStream).flatMap(s -> s);
             }
             case RegistroDeclarationNode(var name, CompundNode(var nodes, _), _) -> {
@@ -69,7 +69,7 @@ public sealed interface Node {
 
             case ArrayAccessNode(var accessor, CompundNode(var nodes, _), _) -> {
                 Stream<Node> arrayNode = Stream.of(accessor);
-                Stream<Node> indexesStream = nodes.stream();
+                Stream<ExpressionNode> indexesStream = nodes.stream();
                 yield Stream.concat(arrayNode, indexesStream);
             }
             case MemberAccessNode(var root, var member, _) -> Stream.of(root, member);
@@ -78,42 +78,42 @@ public sealed interface Node {
             case WriteItemNode(var expr, _, _, _) -> Stream.of(expr);
             case ConditionalCommandNode(var expr, CompundNode(var nodes, _), CompundNode(var elseNodes, _), _) -> {
                 Stream<Node> exprStream = Stream.of(expr);
-                Stream<Node> commands = nodes.stream();
-                Stream<Node> elseCommands = elseNodes.stream();
+                Stream<CommandNode> commands = nodes.stream();
+                Stream<CommandNode> elseCommands = elseNodes.stream();
                 yield Stream.of(exprStream, commands, elseCommands).flatMap(s -> s);
             }
             case RangeNode(var start, var end, _) -> Stream.of(start, end);
             case ChooseCommandNode(var expr, CompundNode(var nodes, _), var defaultCase, _) -> {
                 Stream<Node> exprStream = Stream.of(expr);
-                Stream<Node> cases = nodes.stream();
+                Stream<ChooseCaseNode> cases = nodes.stream();
                 Stream<Node> defaultCaseStream = Stream.of(defaultCase);
                 yield Stream.of(exprStream, cases, defaultCaseStream).flatMap(s -> s);
             }
             case ChooseCaseNode(var value, CompundNode(var nodes, _), _) -> {
                 Stream<Node> valueStream = Stream.of(value);
-                Stream<Node> commandsStream = nodes.stream();
+                Stream<CommandNode> commandsStream = nodes.stream();
                 yield Stream.concat(valueStream, commandsStream);
             }
             case WhileCommandNode(var test, CompundNode(var nodes, _), _, _) -> {
                 Stream<Node> testStream = Stream.of(test);
-                Stream<Node> commandsStream = nodes.stream();
+                Stream<CommandNode> commandsStream = nodes.stream();
                 yield Stream.concat(testStream, commandsStream);
             }
             case ForCommandNode(
                     var identifier, var startValue, var endValue, var step, CompundNode(var nodes, _), _
             ) -> {
                 Stream<Node> header = Stream.of(identifier, startValue, endValue, step);
-                Stream<Node> commands = nodes.stream();
+                Stream<CommandNode> commands = nodes.stream();
                 yield Stream.concat(header, commands);
             }
             case ProcedureCallNode(var name, CompundNode(var nodes, _), _) -> {
                 Stream<Node> nameStream = Stream.of(name);
-                Stream<Node> argsStream = nodes.stream();
+                Stream<ExpressionNode> argsStream = nodes.stream();
                 yield Stream.concat(nameStream, argsStream);
             }
             case FunctionCallNode(var name, CompundNode(var nodes, _), _) -> {
                 Stream<Node> nameStream = Stream.of(name);
-                Stream<Node> argsStream = nodes.stream();
+                Stream<ExpressionNode> argsStream = nodes.stream();
                 yield Stream.concat(nameStream, argsStream);
             }
             case DebugCommandNode debugCommandNode -> Stream.of(debugCommandNode.expr());
@@ -153,7 +153,7 @@ public sealed interface Node {
     sealed interface SubprogramDeclarationNode extends Node {
     }
 
-    record FunctionDeclarationNode(IdNode name, Node returnType, CompundNode parameters, CompundNode references, CompundNode declarations,CompundNode commands, Optional<Location> location) implements SubprogramDeclarationNode {
+    record FunctionDeclarationNode(IdNode name, Node returnType, CompundNode<Node> parameters, CompundNode<Node> references, CompundNode<Node> declarations,CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
         public FunctionDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(returnType);
@@ -165,7 +165,7 @@ public sealed interface Node {
         }
     }
 
-    record ProcedureDeclarationNode(IdNode name, CompundNode parameters, CompundNode references, CompundNode declarations, CompundNode commands, Optional<Location> location) implements SubprogramDeclarationNode {
+    record ProcedureDeclarationNode(IdNode name, CompundNode<Node> parameters, CompundNode<Node> references, CompundNode<Node> declarations, CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
         public ProcedureDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(parameters);
@@ -175,7 +175,7 @@ public sealed interface Node {
         }
     }
 
-    record RegistroDeclarationNode(IdNode name, CompundNode variableDeclarationContexts, Optional<Location> location) implements Node {
+    record RegistroDeclarationNode(IdNode name, CompundNode<Node> variableDeclarationContexts, Optional<Location> location) implements Node {
         public RegistroDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(variableDeclarationContexts);
@@ -191,8 +191,13 @@ public sealed interface Node {
         }
     }
 
-    record CompundNode(List<Node> nodes, Optional<Location> location) implements Node {
-        public static final CompundNode EMPTY = new CompundNode(List.of(), Optional.empty());
+    record CompundNode<T extends Node>(List<T> nodes, Optional<Location> location) implements Node {
+        private static final CompundNode<? extends Node> EMPTY = new CompundNode<>(List.of(), Optional.empty());
+
+        @SuppressWarnings("unchecked")
+        public static <T extends Node> CompundNode<T> empty() {
+            return (CompundNode<T>) EMPTY;
+        }
 
         public CompundNode {
             Objects.requireNonNull(nodes);
@@ -292,7 +297,7 @@ public sealed interface Node {
         }
     }
 
-    record ArrayAccessNode(Node node, CompundNode indexes, Optional<Location> location) implements ExpressionNode {
+    record ArrayAccessNode(Node node, CompundNode<ExpressionNode> indexes, Optional<Location> location) implements ExpressionNode {
         public ArrayAccessNode {
             Objects.requireNonNull(node);
             Objects.requireNonNull(indexes);
@@ -308,14 +313,14 @@ public sealed interface Node {
         }
     }
 
-    record ReadCommandNode(CompundNode exprList, Optional<Location> location) implements CommandNode {
+    record ReadCommandNode(CompundNode<ExpressionNode> exprList, Optional<Location> location) implements CommandNode {
         public ReadCommandNode {
             Objects.requireNonNull(exprList);
             Objects.requireNonNull(location);
         }
     }
 
-    record WriteCommandNode(boolean newLine, CompundNode writeList, Optional<Location> location) implements CommandNode {
+    record WriteCommandNode(boolean newLine, CompundNode<WriteItemNode> writeList, Optional<Location> location) implements CommandNode {
         public WriteCommandNode {
             Objects.requireNonNull(writeList);
             Objects.requireNonNull(location);
@@ -331,7 +336,7 @@ public sealed interface Node {
         }
     }
 
-    record ConditionalCommandNode(ExpressionNode expr, CompundNode commands, CompundNode elseCommands, Optional<Location> location) implements CommandNode {
+    record ConditionalCommandNode(ExpressionNode expr, CompundNode<CommandNode> commands, CompundNode<CommandNode> elseCommands, Optional<Location> location) implements CommandNode {
         public ConditionalCommandNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(commands);
@@ -348,7 +353,7 @@ public sealed interface Node {
         }
     }
 
-    record ChooseCommandNode(ExpressionNode expr, CompundNode cases, Node defaultCase, Optional<Location> location) implements CommandNode {
+    record ChooseCommandNode(ExpressionNode expr, CompundNode<ChooseCaseNode> cases, ChooseCaseNode defaultCase, Optional<Location> location) implements CommandNode {
         public ChooseCommandNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(cases);
@@ -357,7 +362,8 @@ public sealed interface Node {
         }
     }
 
-    record ChooseCaseNode(Node value, CompundNode commands, Optional<Location> location) implements CommandNode {
+    record ChooseCaseNode(Node value, CompundNode<CommandNode> commands, Optional<Location> location) implements CommandNode {
+        public static final ChooseCaseNode EMPTY = new ChooseCaseNode(EmptyNode.INSTANCE, CompundNode.empty(), Optional.empty());
         public ChooseCaseNode {
             Objects.requireNonNull(value);
             Objects.requireNonNull(commands);
@@ -365,7 +371,7 @@ public sealed interface Node {
         }
     }
 
-    record WhileCommandNode(ExpressionNode test, CompundNode commands, boolean conditionAtEnd, Optional<Location> location) implements CommandNode {
+    record WhileCommandNode(ExpressionNode test, CompundNode<CommandNode> commands, boolean conditionAtEnd, Optional<Location> location) implements CommandNode {
         public WhileCommandNode {
             Objects.requireNonNull(test);
             Objects.requireNonNull(commands);
@@ -373,7 +379,7 @@ public sealed interface Node {
         }
     }
 
-    record ForCommandNode(IdNode identifier, Node startValue, Node endValue, Node step, CompundNode commands, Optional<Location> location) implements CommandNode {
+    record ForCommandNode(IdNode identifier, ExpressionNode startValue, ExpressionNode endValue, ExpressionNode step, CompundNode<CommandNode> commands, Optional<Location> location) implements CommandNode {
         public ForCommandNode {
             Objects.requireNonNull(identifier);
             Objects.requireNonNull(startValue);
@@ -384,7 +390,7 @@ public sealed interface Node {
         }
     }
 
-    record ProcedureCallNode(IdNode name, CompundNode args, Optional<Location> location) implements CommandNode {
+    record ProcedureCallNode(IdNode name, CompundNode<ExpressionNode> args, Optional<Location> location) implements CommandNode {
         public ProcedureCallNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(args);
@@ -392,7 +398,7 @@ public sealed interface Node {
         }
     }
 
-    record FunctionCallNode(IdNode name, CompundNode args, Optional<Location> location) implements ExpressionNode {
+    record FunctionCallNode(IdNode name, CompundNode<ExpressionNode> args, Optional<Location> location) implements ExpressionNode {
         public FunctionCallNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(args);
@@ -596,7 +602,7 @@ public sealed interface Node {
         }
     }
 
-    record ArrayTypeNode(TypeNode type, CompundNode sizes, Optional<Location> location) implements Node {
+    record ArrayTypeNode(TypeNode type, CompundNode<Node> sizes, Optional<Location> location) implements Node {
         public ArrayTypeNode {
             Objects.requireNonNull(type);
             Objects.requireNonNull(sizes);

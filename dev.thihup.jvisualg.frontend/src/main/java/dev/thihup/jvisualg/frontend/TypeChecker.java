@@ -745,7 +745,7 @@ public class TypeChecker {
                 yield function.get().returnType();
             }
 
-            case Node.CompundNode _ -> null;
+            case Node.CompundNode<?> _ -> null;
 
             case Node.RangeNode(Node start, Node end, var location) -> {
                 Type startType = getType(start, scope, errors);

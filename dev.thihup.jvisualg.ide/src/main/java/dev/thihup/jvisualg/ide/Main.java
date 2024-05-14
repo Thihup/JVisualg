@@ -126,7 +126,7 @@ public class Main extends Application {
                         appendOutput("\nFim da execução.");
                     })
                     .exceptionally(e -> {
-                        appendOutput(e.toString());
+                        appendOutput(e.getCause().toString());
                         appendOutput("\nExecução terminada por erro.");
                         return null;
                     });

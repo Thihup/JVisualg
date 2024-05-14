@@ -1,12 +1,10 @@
 package dev.thihup.jvisualg.interpreter;
 
 import dev.thihup.jvisualg.frontend.ASTResult;
-import dev.thihup.jvisualg.frontend.Error;
 import dev.thihup.jvisualg.frontend.VisualgParser;
-import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
 
-import java.io.*;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -52,15 +50,15 @@ public class Interpreter {
         try {
             switch (node) {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
-                case Node.ArrayTypeNode arrayTypeNode -> throw new UnsupportedOperationException("ArrayTypeNode not implemented");
+                case Node.ArrayTypeNode _ -> throw new UnsupportedOperationException("ArrayTypeNode not implemented");
                 case Node.CommandNode commandNode -> runCommand(commandNode);
-                case Node.CompundNode compundNode -> compundNode.nodes().forEach(this::run);
+                case Node.CompundNode<?> compundNode -> compundNode.nodes().forEach(this::run);
                 case Node.ConstantNode constantNode -> runConstant(constantNode);
-                case Node.DosNode dosNode -> {}
-                case Node.EmptyNode emptyNode -> {}
-                case Node.RegistroDeclarationNode registroDeclarationNode -> throw new UnsupportedOperationException("RegistroDeclarationNode not implemented");
+                case Node.DosNode _ -> {}
+                case Node.EmptyNode _ -> {}
+                case Node.RegistroDeclarationNode _ -> throw new UnsupportedOperationException("RegistroDeclarationNode not implemented");
                 case Node.SubprogramDeclarationNode subprogramDeclarationNode -> runSubprogramDeclaration(subprogramDeclarationNode);
-                case Node.TypeNode typeNode -> throw new UnsupportedOperationException("TypeNode not implemented");
+                case Node.TypeNode _ -> throw new UnsupportedOperationException("TypeNode not implemented");
                 case Node.VariableDeclarationNode variableDeclarationNode -> runVariableDeclaration(variableDeclarationNode);
                 case Node.ExpressionNode e -> evaluate(e);
             }
@@ -75,67 +73,61 @@ public class Interpreter {
 
     private void runSubprogramDeclaration(Node.SubprogramDeclarationNode subprogramDeclarationNode) {
         switch (subprogramDeclarationNode) {
-            case Node.FunctionDeclarationNode functionDeclarationNode -> {
-                functions.put(functionDeclarationNode.name().id(), functionDeclarationNode);
-            }
-            case Node.ProcedureDeclarationNode procedureDeclarationNode -> {
-                procedures.put(procedureDeclarationNode.name().id(), procedureDeclarationNode);
-            }
+            case Node.FunctionDeclarationNode functionDeclarationNode -> functions.put(functionDeclarationNode.name().id(), functionDeclarationNode);
+            case Node.ProcedureDeclarationNode procedureDeclarationNode -> procedures.put(procedureDeclarationNode.name().id(), procedureDeclarationNode);
         }
     }
 
     private void runCommand(Node.CommandNode commandNode) throws IOException, InterruptedException {
         switch (commandNode) {
             case Node.AleatorioCommandNode aleatorioCommandNode -> aleatorio = aleatorioCommandNode.on();
-            case Node.ArquivoCommandNode arquivoCommandNode -> throw new UnsupportedOperationException("ArquivoCommandNode not implemented");
+            case Node.ArquivoCommandNode _ -> throw new UnsupportedOperationException("ArquivoCommandNode not implemented");
             case Node.AssignmentNode assignmentNode -> runAssignment(assignmentNode);
-            case Node.ChooseCaseNode chooseCaseNode -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
+            case Node.ChooseCaseNode _ -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
             case Node.ChooseCommandNode chooseCommandNode -> {
                 Node.ExpressionNode test = chooseCommandNode.expr();
-                for (Node chooseCaseNode : chooseCommandNode.cases().nodes()) {
-                    Object evaluate = ((Node.ChooseCaseNode) chooseCaseNode).value();
+                for (Node.ChooseCaseNode chooseCaseNode : chooseCommandNode.cases().nodes()) {
+                    Object evaluate = chooseCaseNode.value();
                     switch (evaluate) {
                         case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
                             if (((Number) evaluate(test)).intValue() >= ((Number) evaluate(start)).intValue() && ((Number) evaluate(test)).intValue() <= ((Number) evaluate(end)).intValue()) {
-                                run(((Node.ChooseCaseNode) chooseCaseNode).commands());
+                                run(chooseCaseNode.commands());
                                 return;
                             }
                         }
                         case Node.ExpressionNode e -> {
                             if ((Boolean) evaluate(new Node.EqNode(test, e, Optional.empty()))) {
-                                run(((Node.ChooseCaseNode) chooseCaseNode).commands());
+                                run(chooseCaseNode.commands());
                                 return;
                             }
                         }
                         default -> throw new UnsupportedOperationException("Unsupported type: " + evaluate.getClass());
                     }
                 }
-                switch (chooseCommandNode.defaultCase()) {
-                    case Node.EmptyNode _ -> {}
-                    case Node.ChooseCaseNode(_, var commands, _) -> run(commands);
-                    default -> throw new UnsupportedOperationException("Unsupported type: " + chooseCommandNode.defaultCase().getClass());
-                }
+                Node.ChooseCaseNode caseNode = Objects.requireNonNull(chooseCommandNode.defaultCase());
+                var commands = caseNode.commands();
+                run(commands);
             }
             case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
-            case Node.CronometroCommandNode cronometroCommandNode -> {}
-            case Node.DebugCommandNode debugCommandNode -> throw new UnsupportedOperationException("DebugCommandNode not implemented");
+            case Node.CronometroCommandNode _ -> {}
+            case Node.DebugCommandNode _ -> throw new UnsupportedOperationException("DebugCommandNode not implemented");
             case Node.EcoCommandNode ecoCommandNode -> eco = ecoCommandNode.on();
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
-            case Node.IncrementNode incrementNode -> throw new UnsupportedOperationException("IncrementNode not implemented");
-            case Node.InterrompaCommandNode interrompaCommandNode -> runInterrompaCommand(interrompaCommandNode);
-            case Node.LimpatelaCommandNode limpatelaCommandNode -> {}
-            case Node.PausaCommandNode pausaCommandNode -> {}
+            case Node.IncrementNode _ -> throw new UnsupportedOperationException("IncrementNode not implemented");
+            case Node.InterrompaCommandNode _ -> throw new BreakException();
+            case Node.LimpatelaCommandNode _ -> {}
+            case Node.PausaCommandNode _ -> {}
             case Node.ProcedureCallNode procedureCallNode -> {
                 Node.ProcedureDeclarationNode procedureDeclaration = procedures.get(procedureCallNode.name().id());
                 if (procedureDeclaration != null) {
                     stack.push(new HashMap<>());
                     List<Node> parameters = procedureDeclaration.parameters().nodes();
-                    List<Node> arguments = procedureCallNode.args().nodes();
+                    List<Node.ExpressionNode> arguments = procedureCallNode.args().nodes();
                     if (parameters.size() != arguments.size()) {
                         throw new UnsupportedOperationException("Expected " + parameters.size() + " arguments but got " + arguments.size());
                     }
                     for (int i = 0; i < arguments.size(); i++){
-                        assignVariable(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate((Node.ExpressionNode) arguments.get(i)));
+                        assignVariable(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
                     }
                     run(procedureDeclaration.declarations());
                     run(procedureDeclaration.commands());
@@ -151,7 +143,7 @@ public class Interpreter {
                 stack.element().put("(RESULTADO)", evaluate(returnNode.expr()));
                 throw new ReturnException();
             }
-            case Node.TimerCommandNode timerCommandNode -> {}
+            case Node.TimerCommandNode _ -> {}
             case Node.WhileCommandNode whileCommandNode -> runWhileCommand(whileCommandNode);
             case Node.WriteCommandNode writeCommandNode -> runWriteCommandNode(writeCommandNode);
             case Node.WriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision, _) -> runWriteItemNode(expr, spaces, precision);
@@ -172,28 +164,24 @@ public class Interpreter {
         }
     }
 
-    private void runInterrompaCommand(Node.InterrompaCommandNode interrompaCommandNode) {
-        throw new BreakException();
-    }
-
     private void runAssignment(Node.AssignmentNode assignmentNode) {
         Object evaluate = evaluate(assignmentNode.expr());
         switch (assignmentNode.idOrArray()) {
             case Node.IdNode idNode -> assignVariable(idNode.id(), evaluate);
             case Node.ArrayAccessNode arrayAccessNode -> {
                 Node node = arrayAccessNode.node();
-                Object o = getVariableFromStack((Node.IdNode) node);
-                Node.CompundNode indexes = arrayAccessNode.indexes();
+                Object o = evaluateVariableOrFunction((Node.IdNode) node);
+                Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
                 switch(indexes.nodes().size()) {
                     case 1 -> {
-                        int index = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
+                        int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                         if (o instanceof Double[] && evaluate instanceof Integer i)
                             evaluate = i.doubleValue();
                         Array.set(o, index, evaluate);
                     }
                     case 2 -> {
-                        int index1 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
-                        int index2 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getLast())).intValue();
+                        int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                        int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
                         Object array = Array.get(o, index1);
                         if (array instanceof Double[] && evaluate instanceof Integer i)
                             evaluate = i.doubleValue();
@@ -208,11 +196,11 @@ public class Interpreter {
         }
     }
 
-    private void runWriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision) throws IOException {
+    private void runWriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision) {
         printValue(evaluate(expr), spaces, precision);
     }
 
-    private void runWriteCommandNode(Node.WriteCommandNode writeCommandNode) throws IOException {
+    private void runWriteCommandNode(Node.WriteCommandNode writeCommandNode) {
         run(writeCommandNode.writeList());
         if (writeCommandNode.newLine()) {
             io.output().accept("\n");
@@ -235,7 +223,7 @@ public class Interpreter {
     }
 
     private void runConditionalCommand(Node.ConditionalCommandNode conditionalCommandNode) {
-        if (conditionalCommandNode instanceof Node.ConditionalCommandNode(Node.ExpressionNode expressionNode, Node.CompundNode command, Node.CompundNode elseCommand, _)) {
+        if (conditionalCommandNode instanceof Node.ConditionalCommandNode(Node.ExpressionNode expressionNode, Node.CompundNode<Node.CommandNode> command, Node.CompundNode<Node.CommandNode> elseCommand, _)) {
             if ((Boolean) evaluate(expressionNode)) {
                 run(command);
             } else {
@@ -246,12 +234,12 @@ public class Interpreter {
         }
     }
 
-    private void runReadCommand(Node.ReadCommandNode readCommandNode) throws IOException {
+    private void runReadCommand(Node.ReadCommandNode readCommandNode) {
 
         readCommandNode.exprList().nodes().forEach(expr -> {
             switch (expr) {
                 case Node.IdNode idNode -> {
-                    Object o = getVariableFromStack(idNode);
+                    Object o = evaluateVariableOrFunction(idNode);
                     final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass()))).join();
                     Object value = switch (o) {
                         case Boolean _ when aleatorio -> random.nextBoolean();
@@ -275,25 +263,25 @@ public class Interpreter {
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
                     Node.IdNode node = (Node.IdNode) arrayAccessNode.node();
-                    Object o = getVariableFromStack(node);
+                    Object o = evaluateVariableOrFunction(node);
 
-                    Node.CompundNode indexes = arrayAccessNode.indexes();
+                    Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
                     switch(indexes.nodes().size()) {
                         case 1 -> {
-                            int index = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
+                            int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                             final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType()))).join();
                             Array.set(o, index, readValueForArray(o, inputValue));
                         }
                         case 2 -> {
-                            int index1 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
-                            int index2 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getLast())).intValue();
+                            int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                            int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
                             final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType()))).join();
                             Array.set(Array.get(o, index1), index2, readValueForArray(Array.get(o, index1), inputValue));
                         }
                         default -> throw new UnsupportedOperationException("Unsupported number of indexes: " + indexes.nodes().size());
                     }
                 }
-                case null, default -> throw new UnsupportedOperationException("Unsupported type: " + expr.getClass());
+                default -> throw new UnsupportedOperationException("Unsupported type: " + expr.getClass());
             }
         });
 
@@ -319,19 +307,23 @@ public class Interpreter {
         return o1;
     }
 
-    private Object getVariableFromStack(Node.IdNode idNode) {
-        return stack.stream().map(m -> m.get(idNode.id())).filter(Objects::nonNull).findFirst().orElseThrow(() -> new UnsupportedOperationException("Variable not found: " + idNode.id()));
+    private Object evaluateVariableOrFunction(Node.IdNode idNode) {
+        return stack.stream().filter(m -> m.containsKey(idNode.id())).map(m -> m.get(idNode.id())).findFirst()
+                .or(() -> Optional.ofNullable(functions.get(idNode.id())).map(_ -> new Node.FunctionCallNode(idNode, Node.CompundNode.empty(), Optional.empty())).map(this::evaluateFunction))
+            .orElseThrow(() -> new UnsupportedOperationException("Variable not found: " + idNode.id()));
     }
 
     private void runForCommand(Node.ForCommandNode forCommandNode) {
         Node.IdNode identifier = forCommandNode.identifier();
 
         switch(forCommandNode) {
-            case Node.ForCommandNode(Node.IdNode id, Node.ExpressionNode start, Node.ExpressionNode end, Node.ExpressionNode step, Node.CompundNode command, _) -> {
-                Object variableFromStack = getVariableFromStack(identifier);
-                int startValue = ((Number)evaluate(start)).intValue();
-                int endValue = ((Number)evaluate(end)).intValue();;
-                int stepValue = ((Number)evaluate(step)).intValue();
+            case Node.ForCommandNode(_, _, Node.EmptyExpressionNode _, _, _, _) -> {
+            }
+            case Node.ForCommandNode(Node.IdNode id, Node.ExpressionNode start, Node.ExpressionNode end, Node.ExpressionNode step, Node.CompundNode<Node.CommandNode> command, _) -> {
+                evaluateVariableOrFunction(identifier);
+                int startValue = evaluate(start);
+                int endValue = evaluate(end);
+                int stepValue = evaluate(step);
                 int i;
                 if (stepValue < 0) {
                     for (i = startValue; i >= endValue; i += stepValue) {
@@ -352,13 +344,12 @@ public class Interpreter {
                 }
                 assignVariable(id.id(), i);
             }
-            case Node.ForCommandNode(Node.IdNode id, Node.ExpressionNode start, Node.EmptyNode end, Node.ExpressionNode step, Node.CompundNode command, _) -> {
-            }
+
             default -> throw new UnsupportedOperationException("Unsupported type: " + forCommandNode.getClass());
         }
     }
 
-    private void printValue(Object value, Node spaces, Node precision) throws IOException {
+    private void printValue(Object value, Node spaces, Node precision) {
 
         if (value instanceof Integer i) {
             value = i.doubleValue();
@@ -405,15 +396,16 @@ public class Interpreter {
 
     }
 
-    private Object evaluate(Node.ExpressionNode node){
-        return switch (node) {
+    @SuppressWarnings("unchecked")
+    private <T> T evaluate(Node.ExpressionNode node){
+        return (T) switch (node) {
             case Node.StringLiteralNode(var value, _) -> value;
             case Node.BinaryNode binaryNode -> evaluateBinaryNode(binaryNode);
             case Node.BooleanLiteralNode(var value, _) -> value;
             case Node.FunctionCallNode functionCallNode -> evaluateFunction(functionCallNode);
             case Node.IntLiteralNode(var value, _) -> value;
             case Node.RealLiteralNode(var value, _) -> value;
-            case Node.IdNode idNode -> getVariableFromStack(idNode);
+            case Node.IdNode idNode -> evaluateVariableOrFunction(idNode);
             case Node.NegNode nedNode -> switch (evaluate(nedNode.expr())) {
                 case Double x -> -x;
                 case Integer x -> -x;
@@ -423,24 +415,24 @@ public class Interpreter {
             case Node.NotNode notNode -> !(Boolean) evaluate(notNode.expr());
             case Node.EmptyExpressionNode _ -> 0;
             case Node.ArrayAccessNode arrayAccessNode -> evaluateArrayAccessNode(arrayAccessNode);
-            case Node.MemberAccessNode memberAccessNode -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
-            case Node.RangeNode rangeNode -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
+            case Node.MemberAccessNode _ -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
+            case Node.RangeNode _ -> throw new UnsupportedOperationException("RangeNode not implemented");
         };
     }
 
     private Object evaluateArrayAccessNode(Node.ArrayAccessNode arrayAccessNode) {
         Node node = arrayAccessNode.node();
-        Object o = getVariableFromStack((Node.IdNode) node);
+        Object o = evaluateVariableOrFunction((Node.IdNode) node);
 
-        Node.CompundNode indexes = arrayAccessNode.indexes();
+        Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
         switch(indexes.nodes().size()) {
             case 1 -> {
-                int index = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
+                int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                 return Array.get(o, index);
             }
             case 2 -> {
-                int index1 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getFirst())).intValue();
-                int index2 = ((Number) evaluate((Node.ExpressionNode) indexes.nodes().getLast())).intValue();
+                int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
                 return Array.get(Array.get(o, index1), index2);
             }
             default -> throw new UnsupportedOperationException("Unsupported number of indexes: " + indexes.nodes().size());
@@ -453,12 +445,12 @@ public class Interpreter {
             stack.push(new HashMap<>());
             stack.element().put("(RESULTADO)", newInstance(functionDeclaration.returnType()));
             List<Node> parameters = functionDeclaration.parameters().nodes();
-            List<Node> arguments = functionCallNode.args().nodes();
+            List<Node.ExpressionNode> arguments = functionCallNode.args().nodes();
             if (parameters.size() != arguments.size()) {
                 throw new UnsupportedOperationException("Expected " + parameters.size() + " arguments but got " + arguments.size());
             }
             for (int i = 0; i < arguments.size(); i++){
-                stack.element().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate((Node.ExpressionNode) arguments.get(i)));
+                stack.element().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
             }
             run(functionDeclaration.declarations());
             try {
@@ -470,7 +462,7 @@ public class Interpreter {
             return result;
         } else if (StandardFunctions.FUNCTIONS.containsKey(functionCallNode.name().id())) {
             try {
-                return StandardFunctions.FUNCTIONS.get(functionCallNode.name().id()).invokeWithArguments(functionCallNode.args().nodes().stream().map(node -> evaluate((Node.ExpressionNode) node)).toList());
+                return StandardFunctions.FUNCTIONS.get(functionCallNode.name().id()).invokeWithArguments(functionCallNode.args().nodes().stream().map(this::evaluate).toList());
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
@@ -716,7 +708,7 @@ public class Interpreter {
                 case "logico" -> false;
                 default -> throw new IllegalStateException("Unexpected value: " + type);
             };
-            case Node.ArrayTypeNode(Node.TypeNode type, Node.CompundNode sizes, Optional<Location> location) -> {
+            case Node.ArrayTypeNode(Node.TypeNode type, Node.CompundNode<Node> sizes, _) -> {
                 Class<?> typeClass = getType(type);
                 int[] dimensions = sizes.nodes().stream()
                         .map(Node.RangeNode.class::cast)

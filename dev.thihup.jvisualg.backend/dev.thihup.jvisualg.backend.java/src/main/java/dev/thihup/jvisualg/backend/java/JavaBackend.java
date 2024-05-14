@@ -21,7 +21,7 @@ public class JavaBackend {
 
 
             case Node.CompundNode(
-                    List<? extends Node> nodes, _
+                    var nodes, _
             ) -> nodes.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t"));
 
             case Node.VariableDeclarationNode(Node.IdNode name, Node.ArrayTypeNode type, _) ->
@@ -60,7 +60,7 @@ public class JavaBackend {
                     "%s += %s".formatted(javaOutput(expr), javaOutput(value));
 
 
-            case Node.ForCommandNode(Node.IdNode identifier, Node startValue, Node endValue, Node step, Node.CompundNode commands, _) -> {
+            case Node.ForCommandNode(Node.IdNode identifier, Node startValue, Node endValue, Node step, var commands, _) -> {
                 yield """
                         for (%s = %s; %s <= %s; %s += %s) {
                             %s
@@ -68,7 +68,7 @@ public class JavaBackend {
                         """.formatted(javaOutput(identifier), javaOutput(startValue), javaOutput(identifier), javaOutput(endValue), javaOutput(identifier), javaOutput(step), commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining()));
             }
 
-            case Node.WhileCommandNode(Node condition, Node.CompundNode commands, boolean atTheEnd, _) -> {
+            case Node.WhileCommandNode(Node condition, var commands, boolean atTheEnd, _) -> {
                 if (atTheEnd) {
                     yield """
                             do {
@@ -84,7 +84,7 @@ public class JavaBackend {
                 }
             }
 
-            case Node.WriteCommandNode(boolean newLine, Node.CompundNode writeList, _) -> {
+            case Node.WriteCommandNode(boolean newLine, var writeList, _) -> {
                 if (newLine) {
                     yield "System.out.println(%s);".formatted(writeList.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(" + ")));
                 } else {
@@ -105,7 +105,7 @@ public class JavaBackend {
             }
 
             case Node.ConditionalCommandNode(
-                    Node condition, Node.CompundNode thenCommands, Node.CompundNode elseCommands, _
+                    Node condition, var thenCommands, var elseCommands, _
             ) -> {
                 if (elseCommands.nodes().isEmpty()) {
                     yield """
@@ -124,7 +124,7 @@ public class JavaBackend {
                 }
             }
 
-            case Node.RegistroDeclarationNode(Node.IdNode name, Node.CompundNode variableDeclarationContexts, _) -> """
+            case Node.RegistroDeclarationNode(Node.IdNode name, var variableDeclarationContexts, _) -> """
                     class %s {
                         %s
                     }
@@ -140,23 +140,23 @@ public class JavaBackend {
 
             case Node.IdNode(String id, _) -> id;
 
-            case Node.ArrayAccessNode(Node.IdNode id, Node.CompundNode indexes, _) ->
+            case Node.ArrayAccessNode(Node.IdNode id, var indexes, _) ->
                     "%s[%s-1]".formatted(javaOutput(id), indexes.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][")));
 
 
-            case Node.FunctionCallNode(Node.IdNode name, Node.CompundNode args, _) ->
+            case Node.FunctionCallNode(Node.IdNode name, var args, _) ->
                     "%s(%s)".formatted(name.id(), args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
 
-            case Node.ProcedureCallNode(Node.IdNode name, Node.CompundNode args, _) ->
+            case Node.ProcedureCallNode(Node.IdNode name, var args, _) ->
                     "%s(%s)".formatted(name.id(), args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
 
             case Node.FunctionDeclarationNode(
-                    Node.IdNode name, Node type, Node.CompundNode args, Node.CompundNode references, Node.CompundNode declarations, Node.CompundNode commands, _
+                    Node.IdNode name, Node type, var args, var references, var declarations, var commands, _
             ) ->
                     "%s %s(%s) { %s }".formatted(javaOutput(type), name, args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
 
             case Node.ProcedureDeclarationNode(
-                    Node.IdNode name, Node.CompundNode args, Node.CompundNode references, Node.CompundNode declarations, Node.CompundNode commands, _
+                    Node.IdNode name, var args, var references, var declarations, var commands, _
             ) ->
                     "void %s(%s) { %s }".formatted(name, args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
 
