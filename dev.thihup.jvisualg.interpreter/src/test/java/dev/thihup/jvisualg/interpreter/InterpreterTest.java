@@ -8,9 +8,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
 
@@ -455,8 +457,6 @@ class InterpreterTest extends ExamplesBase {
     @ParameterizedTest
     @MethodSource({"examplesV25", "examplesV30"})
     void testExamples(Path path) throws Throwable {
-        ASTResult astResult = VisualgParser.parse(Files.newInputStream(path));
-
         RandomGenerator aDefault = RandomGenerator.getDefault();
 
         IO io = new IO(
@@ -470,9 +470,8 @@ class InterpreterTest extends ExamplesBase {
             })
         , System.out::println);
 
-        CompletableFuture.runAsync(() -> {
-            Interpreter interpreter = new Interpreter(io);
-            interpreter.run(astResult.node().get());
-        }).get(3, TimeUnit.SECONDS);
+        Interpreter interpreter = new Interpreter(io);
+
+        interpreter.run(Files.readString(path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor()).get(1, TimeUnit.SECONDS);
     }
 }

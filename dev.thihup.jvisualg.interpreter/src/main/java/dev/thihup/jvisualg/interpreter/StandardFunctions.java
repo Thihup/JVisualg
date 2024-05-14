@@ -49,13 +49,13 @@ public class StandardFunctions {
             ARCTAN = MethodHandles.lookup().findStatic(Math.class, "atan", MethodType.methodType(double.class, double.class));
             COS = MethodHandles.lookup().findStatic(Math.class, "cos", MethodType.methodType(double.class, double.class));
             COTAN = MethodHandles.lookup().findStatic(Math.class, "tan", MethodType.methodType(double.class, double.class));
-            EXP = MethodHandles.lookup().findStatic(Math.class, "exp", MethodType.methodType(double.class, double.class));
+            EXP = MethodHandles.lookup().findStatic(Math.class, "pow", MethodType.methodType(double.class, double.class, double.class));
             GRAUPRAD = MethodHandles.lookup().findStatic(Math.class, "toRadians", MethodType.methodType(double.class, double.class));
-            INT = MethodHandles.lookup().findStatic(Math.class, "floor", MethodType.methodType(double.class, double.class));
+            INT = MethodHandles.lookup().findVirtual(Number.class, "intValue", MethodType.methodType(int.class));
             LOG = MethodHandles.lookup().findStatic(Math.class, "log10", MethodType.methodType(double.class, double.class));
             LOGN = MethodHandles.lookup().findStatic(Math.class, "log", MethodType.methodType(double.class, double.class));
             PI = MethodHandles.lookup().findStaticGetter(Math.class, "PI", double.class);
-            QUAD = MethodHandles.lookup().findStatic(Math.class, "pow", MethodType.methodType(double.class, double.class, double.class));
+            QUAD = MethodHandles.insertArguments(MethodHandles.lookup().findStatic(Math.class, "pow", MethodType.methodType(double.class, double.class, double.class)), 1, 2);
             RADPGRAD = MethodHandles.lookup().findStatic(Math.class, "toDegrees", MethodType.methodType(double.class, double.class));
 
             RAIZQ = MethodHandles.lookup().findStatic(Math.class, "sqrt", MethodType.methodType(double.class, double.class));

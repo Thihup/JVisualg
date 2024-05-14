@@ -128,7 +128,7 @@ public class Interpreter {
                         throw new UnsupportedOperationException("Expected " + parameters.size() + " arguments but got " + arguments.size());
                     }
                     for (int i = 0; i < arguments.size(); i++){
-                        assignVariable(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
+                        stack.element().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
                     }
                     run(procedureDeclaration.declarations());
                     run(procedureDeclaration.commands());
@@ -322,9 +322,9 @@ public class Interpreter {
             }
             case Node.ForCommandNode(Node.IdNode id, Node.ExpressionNode start, Node.ExpressionNode end, Node.ExpressionNode step, Node.CompundNode<Node.CommandNode> command, _) -> {
                 evaluateVariableOrFunction(identifier);
-                int startValue = evaluate(start);
-                int endValue = evaluate(end);
-                int stepValue = evaluate(step);
+                int startValue = this.<Number>evaluate(start).intValue();
+                int endValue = this.<Number>evaluate(end).intValue();;
+                int stepValue = this.<Number>evaluate(step).intValue();
                 int i;
                 if (stepValue < 0) {
                     for (i = startValue; i >= endValue; i += stepValue) {
