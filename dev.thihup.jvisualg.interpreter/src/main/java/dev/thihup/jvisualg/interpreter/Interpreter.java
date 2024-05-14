@@ -135,7 +135,7 @@ public class Interpreter {
                         throw new UnsupportedOperationException("Expected " + parameters.size() + " arguments but got " + arguments.size());
                     }
                     for (int i = 0; i < arguments.size(); i++){
-                        stack.element().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate((Node.ExpressionNode) arguments.get(i)));
+                        assignVariable(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate((Node.ExpressionNode) arguments.get(i)));
                     }
                     run(procedureDeclaration.declarations());
                     run(procedureDeclaration.commands());
@@ -179,7 +179,7 @@ public class Interpreter {
     private void runAssignment(Node.AssignmentNode assignmentNode) {
         Object evaluate = evaluate(assignmentNode.expr());
         switch (assignmentNode.idOrArray()) {
-            case Node.IdNode idNode -> stack.element().put(idNode.id(), evaluate);
+            case Node.IdNode idNode -> assignVariable(idNode.id(), evaluate);
             case Node.ArrayAccessNode arrayAccessNode -> {
                 Node node = arrayAccessNode.node();
                 Object o = getVariableFromStack((Node.IdNode) node);
@@ -270,8 +270,8 @@ public class Interpreter {
                     };
                     if (eco)
                         io.output().accept(value + "\n");
-                    
-                    stack.element().put(idNode.id(), value);
+
+                    assignVariable(idNode.id(), value);
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
                     Node.IdNode node = (Node.IdNode) arrayAccessNode.node();
@@ -335,7 +335,7 @@ public class Interpreter {
                 int i;
                 if (stepValue < 0) {
                     for (i = startValue; i >= endValue; i += stepValue) {
-                        stack.element().put(id.id(), i);
+                        assignVariable(id.id(), i);
                         try {
                             run(command);
                         } catch (BreakException _) {
@@ -343,14 +343,14 @@ public class Interpreter {
                     }
                 } else {
                     for (i = startValue; i <= endValue; i += stepValue) {
-                        stack.element().put(id.id(), i);
+                        assignVariable(id.id(), i);
                         try {
                             run(command);
                         } catch (BreakException _) {
                         }
                     }
                 }
-                stack.element().put(id.id(), i);
+                assignVariable(id.id(), i);
             }
             case Node.ForCommandNode(Node.IdNode id, Node.ExpressionNode start, Node.EmptyNode end, Node.ExpressionNode step, Node.CompundNode command, _) -> {
             }
@@ -686,6 +686,12 @@ public class Interpreter {
 
     private void runVariableDeclaration(Node.VariableDeclarationNode variableDeclarationNode) {
         stack.element().put(variableDeclarationNode.name().id(), newInstance(variableDeclarationNode.type()));
+    }
+
+    private void assignVariable(String name, Object value) {
+        stack.stream().filter(m -> m.containsKey(name)).findFirst().ifPresentOrElse(m -> m.put(name, value), () -> {
+            throw new UnsupportedOperationException("Variable not found: " + name);
+        });
     }
 
     private Class<?> getType(Node typeNode) {
