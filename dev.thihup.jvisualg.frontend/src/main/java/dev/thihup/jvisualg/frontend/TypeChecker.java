@@ -379,15 +379,13 @@ public class TypeChecker {
             errors.add(new Error("Choose command with non-integer type: " + type, commandNode.expr().location().orElse(Location.EMPTY)));
         }
         commandNode.cases().nodes().forEach(cases -> {
-            if (cases instanceof Node.ChooseCaseNode caseNode) {
-                if (!areTypesCompatible(type, getType(caseNode.value(), scope, errors))) {
-                    errors.add(new Error("Choose case with different types: " + type + " and " + getType(caseNode.value(), scope, errors), caseNode.value().location().orElse(Location.EMPTY)));
+            cases.value().nodes().forEach(caseNode -> {
+                if (!areTypesCompatible(type, getType(caseNode, scope, errors))) {
+                    errors.add(new Error("Choose case with different types: " + type + " and " + getType(caseNode, scope, errors), caseNode.location().orElse(Location.EMPTY)));
                 } else {
-                    caseNode.commands().nodes().forEach(caseCommand -> typeCheckCommand(caseCommand, scope, errors));
+                    cases.commands().nodes().forEach(caseCommand -> typeCheckCommand(caseCommand, scope, errors));
                 }
-            } else {
-                errors.add(new Error("Unsupported choose case node: " + cases.getClass(), cases.location().orElse(Location.EMPTY)));
-            }
+            });
         });
     }
 

@@ -87,22 +87,23 @@ public class Interpreter {
             case Node.ChooseCommandNode chooseCommandNode -> {
                 Node.ExpressionNode test = chooseCommandNode.expr();
                 for (Node.ChooseCaseNode chooseCaseNode : chooseCommandNode.cases().nodes()) {
-                    Object evaluate = chooseCaseNode.value();
-                    switch (evaluate) {
-                        case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
-                            if (((Number) evaluate(test)).intValue() >= ((Number) evaluate(start)).intValue() && ((Number) evaluate(test)).intValue() <= ((Number) evaluate(end)).intValue()) {
-                                run(chooseCaseNode.commands());
-                                return;
-                            }
-                        }
-                        case Node.ExpressionNode e -> {
-                            if ((Boolean) evaluate(new Node.EqNode(test, e, Optional.empty()))) {
-                                run(chooseCaseNode.commands());
-                                return;
-                            }
-                        }
-                        default -> throw new UnsupportedOperationException("Unsupported type: " + evaluate.getClass());
-                    }
+                    for (Node.ExpressionNode values : chooseCaseNode.value().nodes()) {
+                         switch (values) {
+                             case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
+                                 int value = ((Number) evaluate(test)).intValue();
+                                 if (value >= ((Number) evaluate(start)).intValue() && value <= ((Number) evaluate(end)).intValue()) {
+                                     run(chooseCaseNode.commands());
+                                     return;
+                                 }
+                             }
+                             case Node.ExpressionNode e -> {
+                                 if ((Boolean) evaluate(new Node.EqNode(test, e, Optional.empty()))) {
+                                     run(chooseCaseNode.commands());
+                                     return;
+                                 }
+                             }
+                         }
+                     }
                 }
                 Node.ChooseCaseNode caseNode = Objects.requireNonNull(chooseCommandNode.defaultCase());
                 var commands = caseNode.commands();

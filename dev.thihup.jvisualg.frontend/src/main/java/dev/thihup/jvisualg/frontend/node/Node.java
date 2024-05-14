@@ -362,8 +362,8 @@ public sealed interface Node {
         }
     }
 
-    record ChooseCaseNode(Node value, CompundNode<CommandNode> commands, Optional<Location> location) implements CommandNode {
-        public static final ChooseCaseNode EMPTY = new ChooseCaseNode(EmptyNode.INSTANCE, CompundNode.empty(), Optional.empty());
+    record ChooseCaseNode(CompundNode<ExpressionNode> value, CompundNode<CommandNode> commands, Optional<Location> location) implements CommandNode {
+        public static final ChooseCaseNode EMPTY = new ChooseCaseNode(CompundNode.empty(), CompundNode.empty(), Optional.empty());
         public ChooseCaseNode {
             Objects.requireNonNull(value);
             Objects.requireNonNull(commands);

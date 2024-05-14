@@ -331,7 +331,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
 
     @Override
-    public Node visitChooseCommand(VisuAlgParser.ChooseCommandContext ctx) {
+    public ChooseCommandNode visitChooseCommand(VisuAlgParser.ChooseCommandContext ctx) {
         ExpressionNode expr = visitExpr(ctx.expr());
         CompundNode<ChooseCaseNode> cases = ctx.chooseCase().stream().map(this::visitChooseCase).collect(toCompundNode(fromRuleContext(ctx)));
         VisuAlgParser.OutroCaseContext outroCaseContext = ctx.outroCase();
@@ -341,15 +341,20 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public ChooseCaseNode visitChooseCase(VisuAlgParser.ChooseCaseContext ctx) {
-        Node expr = visit(ctx.exprOrAteList());
+        CompundNode<ExpressionNode> expr = visitExprOrAteList(ctx.exprOrAteList());
         CompundNode<CommandNode> commands = ctx.commands().command().stream().map(this::visitCommand).collect(toCompundNode(fromRuleContext(ctx)));
         return new ChooseCaseNode(expr, commands, fromRuleContext(ctx));
     }
 
     @Override
+    public CompundNode<ExpressionNode> visitExprOrAteList(VisuAlgParser.ExprOrAteListContext ctx) {
+        return ctx.exprOrAte().stream().map(this::visit).map(x -> (ExpressionNode) x).collect(toCompundNode(fromRuleContext(ctx)));
+    }
+
+    @Override
     public ChooseCaseNode visitOutroCase(VisuAlgParser.OutroCaseContext ctx) {
         CompundNode<CommandNode> commands = ctx.commands().command().stream().map(this::visitCommand).collect(toCompundNode(fromRuleContext(ctx)));
-        return new ChooseCaseNode(EmptyExpressionNode.INSTANCE, commands, fromRuleContext(ctx));
+        return new ChooseCaseNode(CompundNode.empty(), commands, fromRuleContext(ctx));
     }
 
     @Override
