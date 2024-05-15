@@ -1,14 +1,11 @@
 package dev.thihup.jvisualg.interpreter;
 
 import dev.thihup.jvisualg.examples.ExamplesBase;
-import dev.thihup.jvisualg.frontend.ASTResult;
-import dev.thihup.jvisualg.frontend.VisualgParser;
-import dev.thihup.jvisualg.frontend.node.Location;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.io.*;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,7 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class InterpreterTest extends ExamplesBase {
     @Test
@@ -462,14 +459,14 @@ class InterpreterTest extends ExamplesBase {
 
         IO io = new IO(
             inputRequest -> CompletableFuture.completedFuture(switch (inputRequest.type()) {
-                case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(100));
-                case REAL -> new InputValue.RealValue(aDefault.nextDouble(100));
+                case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(10));
+                case REAL -> new InputValue.RealValue(aDefault.nextDouble(10));
                 case LOGICO -> new InputValue.LogicoValue(aDefault.nextBoolean());
                 case CARACTER ->  new InputValue.CaracterValue(aDefault.ints(65, 91)
                         .limit(5)
                         .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
             })
-        , System.out::println);
+        , _ -> {});
 
         Interpreter interpreter = new Interpreter(io);
 

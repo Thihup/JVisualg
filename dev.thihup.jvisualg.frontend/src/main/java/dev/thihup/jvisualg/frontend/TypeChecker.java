@@ -278,7 +278,7 @@ public class TypeChecker {
 
             case Node.IdNode idNode -> handleIdNode(scope, errors, idNode);
 
-            case Node.DivNode(Node left, Node right, var location) ->
+            case Node.DivNode(Node left, Node right, _,var location) ->
                     handleDivNode(scope, errors, left, right, location.orElse(Location.EMPTY));
 
             case Node.ModNode(Node left, Node right, var location) ->
@@ -422,6 +422,10 @@ public class TypeChecker {
         Optional<Declaration.Function> function = scope.function(functionCallNode.name().id());
         if (function.isEmpty()) {
             errors.add(new Error("Function " + functionCallNode.name().id() + " not declared", functionCallNode.location().orElse(Location.EMPTY)));
+            return;
+        }
+        if (functionCallNode.args().nodes().size() != function.get().parameters().size()) {
+            errors.add(new Error("Function " + functionCallNode.name().id() + "called with wrong number of arguments. Expected: " + function.get().parameters().size() + " but got: " + functionCallNode.args().nodes().size(), functionCallNode.location().orElse(Location.EMPTY)));
         }
     }
 
@@ -429,6 +433,10 @@ public class TypeChecker {
         Optional<Declaration.Procedure> procedure = scope.procedure(procedureCallNode.name().id());
         if (procedure.isEmpty()) {
             errors.add(new Error("Procedure " + procedureCallNode.name().id() + " not declared", procedureCallNode.location().orElse(Location.EMPTY)));
+            return;
+        }
+        if (procedureCallNode.args().nodes().size() != procedure.get().parameters().size()) {
+            errors.add(new Error("Procedure " + procedureCallNode.name().id() + "called with wrong number of arguments. Expected: " + procedure.get().parameters().size() + " but got: " + procedureCallNode.args().nodes().size(), procedureCallNode.location().orElse(Location.EMPTY)));
         }
     }
 

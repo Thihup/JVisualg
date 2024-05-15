@@ -38,7 +38,6 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         return new AlgoritimoNode(new StringLiteralNode(ctx.STRING().getText(), fromTerminalNode(ctx.STRING())), visit(ctx.declarations()), visit(ctx.commands()), fromRuleContext(ctx));
     }
 
-
     @Override
     public Node visitDeclarations(VisuAlgParser.DeclarationsContext ctx) {
         if (ctx.children == null) {
@@ -66,17 +65,18 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     }
 
     @Override
-    public Node visitFormalParameter(VisuAlgParser.FormalParameterContext ctx) {
-        return new CompundNode<>(ctx.ID().stream().map(x -> new VariableDeclarationNode(visitId(x), visit(ctx.type()), fromRuleContext(ctx))).toList(), fromRuleContext(ctx));
+    public CompundNode<VariableDeclarationNode> visitFormalParameter(VisuAlgParser.FormalParameterContext ctx) {
+        return new CompundNode<>(ctx.ID().stream().map(x -> new VariableDeclarationNode(visitId(x), visit(ctx.type()), ctx.VAR() != null, fromRuleContext(ctx))).toList(), fromRuleContext(ctx));
     }
 
     @Override
     public Node visitProcedureDeclaration(VisuAlgParser.ProcedureDeclarationContext ctx) {
-        CompundNode<Node> parameters;
+        CompundNode<VariableDeclarationNode> parameters;
         if (ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context) {
-            parameters = context.formalParameter().stream().map(this::visit).mapMulti((Node a, Consumer<Node> b) -> {
-                ((CompundNode<Node>)a).nodes().forEach(b);
+            parameters = context.formalParameter().stream().map(this::visitFormalParameter).mapMulti((CompundNode<VariableDeclarationNode> a, Consumer<VariableDeclarationNode> b) -> {
+                a.nodes().forEach(b);
             }).collect(toCompundNode(fromRuleContext(context)));
+
         } else {
             parameters = CompundNode.empty();
         }
@@ -85,7 +85,6 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         return new ProcedureDeclarationNode(
             visitId(ctx.ID()),
                 parameters,
-                CompundNode.empty(),
                 declarations,
                 commands,
             fromRuleContext(ctx)
@@ -94,10 +93,10 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitFunctionDeclaration(VisuAlgParser.FunctionDeclarationContext ctx) {
-        CompundNode<Node> parameters;
+        CompundNode<VariableDeclarationNode> parameters;
         if (ctx.formalParameterList() instanceof VisuAlgParser.FormalParameterListContext context) {
-            parameters = context.formalParameter().stream().map(this::visit).mapMulti((Node a, Consumer<Node> b) -> {
-                ((CompundNode<Node>)a).nodes().forEach(b);
+            parameters = context.formalParameter().stream().map(this::visitFormalParameter).mapMulti((CompundNode<VariableDeclarationNode> a, Consumer<VariableDeclarationNode> b) -> {
+                a.nodes().forEach(b);
             }).collect(toCompundNode(fromRuleContext(context)));
         } else {
             parameters = CompundNode.empty();
@@ -108,7 +107,6 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
                 visitId(ctx.ID()),
                 visitType(ctx.type()),
                 parameters,
-                CompundNode.empty(),
                 declarations,
                 commands,
                 fromRuleContext(ctx)
@@ -130,7 +128,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     @Override
     public Node visitVariableDeclaration(VisuAlgParser.VariableDeclarationContext ctx) {
         return ctx.ID().stream()
-                .map(x -> new VariableDeclarationNode(visitId(x), visit(ctx.type()), fromRuleContext(ctx)))
+                .map(x -> new VariableDeclarationNode(visitId(x), visit(ctx.type()), false, fromRuleContext(ctx)))
                 .collect(toCompundNode(fromRuleContext(ctx)));
     }
 
@@ -401,7 +399,8 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
             case "+" -> new AddNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             case "-" -> new SubNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             case "*" -> new MulNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
-            case "/", "div", "\\" -> new DivNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
+            case "/", "div" -> new DivNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), false, fromRuleContext(ctx));
+            case "\\" -> new DivNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), true, fromRuleContext(ctx));
             case "e" -> new AndNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             case "ou" -> new OrNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), fromRuleContext(ctx));
             case "nao", "não" -> new NotNode(visitExpr(ctx.expr(0)), fromRuleContext(ctx));

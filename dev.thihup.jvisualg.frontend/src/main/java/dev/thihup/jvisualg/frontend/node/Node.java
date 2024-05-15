@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public sealed interface Node {
@@ -32,31 +33,29 @@ public sealed interface Node {
             case AlgoritimoNode(var literalNode, var declarations, var commands, _) ->
                     Stream.of(literalNode, declarations, commands);
             case FunctionDeclarationNode(
-                    var name, var returnType, var parameters, var references, var declarations, var commands, _
+                    var name, var returnType, var parameters, var declarations, var commands, _
             ) -> {
                 Stream<Node> nodeStream = Stream.of(name, returnType);
-                Stream<Node> parametersStream = parameters.nodes().stream();
-                Stream<Node> referencesStream = references.nodes().stream();
+                Stream<VariableDeclarationNode> parametersStream = parameters.nodes().stream();
                 Stream<Node> declarationsStream = declarations.nodes().stream();
                 Stream<CommandNode> commandsStream = commands.nodes().stream();
-                yield Stream.of(nodeStream, parametersStream, referencesStream, declarationsStream, commandsStream).flatMap(s -> s);
+                yield Stream.of(nodeStream, parametersStream, declarationsStream, commandsStream).flatMap(s -> s);
             }
             case ProcedureDeclarationNode(
-                    var name, var parameters, var references, var declarations, var commands, _
+                    var name, var parameters, var declarations, var commands, _
             ) -> {
                 Stream<Node> nodeStream = Stream.of(name);
-                Stream<Node> parametersStream = parameters.nodes().stream();
-                Stream<Node> referencesStream = references.nodes().stream();
+                Stream<VariableDeclarationNode> parametersStream = parameters.nodes().stream();
                 Stream<Node> declarationsStream = declarations.nodes().stream();
                 Stream<CommandNode> commandsStream = commands.nodes().stream();
-                yield Stream.of(nodeStream, parametersStream, referencesStream, declarationsStream, commandsStream).flatMap(s -> s);
+                yield Stream.of(nodeStream, parametersStream, declarationsStream, commandsStream).flatMap(s -> s);
             }
             case RegistroDeclarationNode(var name, CompundNode(var nodes, _), _) -> {
                 Stream<Node> nodeStream = Stream.of(name);
                 Stream<Node> nodesStream = nodes.stream();
                 yield Stream.concat(nodeStream, nodesStream);
             }
-            case VariableDeclarationNode(var name, var type, _) -> Stream.of(name, type);
+            case VariableDeclarationNode(var name, var type, _, _) -> Stream.of(name, type);
             case CompundNode(var nodes, _) -> nodes.stream();
             case ConstantNode(var name, var value, _) -> Stream.of(name, value);
             case BooleanLiteralNode _, IntLiteralNode _, RealLiteralNode _, StringLiteralNode _, TypeNode _ ->
@@ -152,25 +151,27 @@ public sealed interface Node {
     }
 
     sealed interface SubprogramDeclarationNode extends Node {
+        IdNode name();
+        CompundNode<VariableDeclarationNode> parameters();
+        CompundNode<Node> declarations();
+        CompundNode<CommandNode> commands();
     }
 
-    record FunctionDeclarationNode(IdNode name, Node returnType, CompundNode<Node> parameters, CompundNode<Node> references, CompundNode<Node> declarations,CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
+    record FunctionDeclarationNode(IdNode name, Node returnType, CompundNode<VariableDeclarationNode> parameters, CompundNode<Node> declarations,CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
         public FunctionDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(returnType);
             Objects.requireNonNull(parameters);
-            Objects.requireNonNull(references);
             Objects.requireNonNull(declarations);
             Objects.requireNonNull(commands);
             Objects.requireNonNull(location);
         }
     }
 
-    record ProcedureDeclarationNode(IdNode name, CompundNode<Node> parameters, CompundNode<Node> references, CompundNode<Node> declarations, CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
+    record ProcedureDeclarationNode(IdNode name, CompundNode<VariableDeclarationNode> parameters, CompundNode<Node> declarations, CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
         public ProcedureDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(parameters);
-            Objects.requireNonNull(references);
             Objects.requireNonNull(declarations);
             Objects.requireNonNull(commands);
         }
@@ -184,7 +185,7 @@ public sealed interface Node {
         }
     }
 
-    record VariableDeclarationNode(IdNode name, Node type, Optional<Location> location) implements Node {
+    record VariableDeclarationNode(IdNode name, Node type, boolean reference, Optional<Location> location) implements Node {
         public VariableDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(type);
@@ -391,7 +392,12 @@ public sealed interface Node {
         }
     }
 
-    record ProcedureCallNode(IdNode name, CompundNode<ExpressionNode> args, Optional<Location> location) implements CommandNode {
+    sealed interface SubprogramCallNode extends Node {
+        IdNode name();
+        CompundNode<ExpressionNode> args();
+    }
+
+    record ProcedureCallNode(IdNode name, CompundNode<ExpressionNode> args, Optional<Location> location) implements CommandNode, SubprogramCallNode {
         public ProcedureCallNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(args);
@@ -399,7 +405,7 @@ public sealed interface Node {
         }
     }
 
-    record FunctionCallNode(IdNode name, CompundNode<ExpressionNode> args, Optional<Location> location) implements ExpressionNode {
+    record FunctionCallNode(IdNode name, CompundNode<ExpressionNode> args, Optional<Location> location) implements ExpressionNode, SubprogramCallNode {
         public FunctionCallNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(args);
@@ -437,7 +443,7 @@ public sealed interface Node {
         }
     }
 
-    record DivNode(ExpressionNode left, ExpressionNode right, Optional<Location> location) implements BinaryNode {
+    record DivNode(ExpressionNode left, ExpressionNode right, boolean integerResult, Optional<Location> location) implements BinaryNode {
         public DivNode {
             Objects.requireNonNull(left);
             Objects.requireNonNull(right);

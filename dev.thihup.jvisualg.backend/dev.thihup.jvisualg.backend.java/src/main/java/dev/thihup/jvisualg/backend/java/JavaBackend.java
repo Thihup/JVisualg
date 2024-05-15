@@ -2,7 +2,6 @@ package dev.thihup.jvisualg.backend.java;
 
 import dev.thihup.jvisualg.frontend.node.Node;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 public class JavaBackend {
@@ -24,10 +23,10 @@ public class JavaBackend {
                     var nodes, _
             ) -> nodes.stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t"));
 
-            case Node.VariableDeclarationNode(Node.IdNode name, Node.ArrayTypeNode type, _) ->
+            case Node.VariableDeclarationNode(Node.IdNode name, Node.ArrayTypeNode type, _, _) ->
                     "%s%s %s = new %s%s;".formatted(javaOutput(type.type()), "[]".repeat(type.sizes().nodes().size()), name.id(), javaOutput(type.type()), type.sizes().nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("][", "[", "]")));
 
-            case Node.VariableDeclarationNode(Node.IdNode name, Node type, _) -> "%s %s;".formatted(javaOutput(type), name.id());
+            case Node.VariableDeclarationNode(Node.IdNode name, Node type, _,  _) -> "%s %s;".formatted(javaOutput(type), name.id());
 
             case Node.ConstantNode(Node.IdNode name, Node.IntLiteralNode(int value, _), _) ->
                     "private static final int %s = %s;".formatted(name.id(), value);
@@ -151,16 +150,16 @@ public class JavaBackend {
                     "%s(%s)".formatted(name.id(), args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")));
 
             case Node.FunctionDeclarationNode(
-                    Node.IdNode name, Node type, var args, var references, var declarations, var commands, _
+                    Node.IdNode name, Node type, var args, var declarations, var commands, _
             ) ->
                     "%s %s(%s) { %s }".formatted(javaOutput(type), name, args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
 
             case Node.ProcedureDeclarationNode(
-                    Node.IdNode name, var args, var references, var declarations, var commands, _
+                    Node.IdNode name, var args, var declarations, var commands, _
             ) ->
                     "void %s(%s) { %s }".formatted(name, args.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining(", ")), declarations.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")) + commands.nodes().stream().map(JavaBackend::javaOutput).collect(Collectors.joining("\n\t")));
 
-            case Node.DivNode(Node left, Node right, _) -> "%s / %s".formatted(javaOutput(left), javaOutput(right));
+            case Node.DivNode(Node left, Node right, _, _) -> "%s / %s".formatted(javaOutput(left), javaOutput(right));
             case Node.MulNode(Node left, Node right, _) -> "%s * %s".formatted(javaOutput(left), javaOutput(right));
             case Node.AddNode(Node left, Node right, _) -> "%s + %s".formatted(javaOutput(left), javaOutput(right));
             case Node.SubNode(Node left, Node right, _) -> "%s - %s".formatted(javaOutput(left), javaOutput(right));
