@@ -856,12 +856,18 @@ public class Interpreter {
                     if (variableClass == Integer.class && valueClass == Double.class) {
                         valueToAssign = ((Number) value).intValue();
                     }
+                    if (variableClass == Double.class && valueClass == Integer.class) {
+                        valueToAssign = ((Number) value).doubleValue();
+                    }
                 }
                 case SIMPLE -> {
                     Class<?> variableClass = m.get(name).getClass();
                     Class<?> valueClass = value.getClass();
                     if (variableClass == Integer.class && valueClass == Double.class) {
                         throw new UnsupportedOperationException("Cannot assign " + valueClass + " to " + variableClass);
+                    }
+                    if (variableClass == Double.class && valueClass == Integer.class) {
+                        valueToAssign = ((Number) value).doubleValue();
                     }
                 }
             }
