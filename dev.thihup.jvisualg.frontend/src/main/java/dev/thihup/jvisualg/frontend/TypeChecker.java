@@ -52,8 +52,10 @@ public class TypeChecker {
                     Map.entry("radpgrau", new Declaration.Function("radpgrau", Type.PrimitiveTypes.REAL, Map.of("valor", new Declaration.Variable("valor", Type.PrimitiveTypes.REAL)))),
                     Map.entry("raizq", new Declaration.Function("raizq", Type.PrimitiveTypes.REAL, Map.of("valor", new Declaration.Variable("valor", Type.PrimitiveTypes.REAL)))),
                     Map.entry("rand", new Declaration.Function("rand", Type.PrimitiveTypes.REAL, Map.of())),
-                    Map.entry("randi", new Declaration.Function("randi", Type.PrimitiveTypes.INTEIRO, Map.of("limite", new Declaration.Variable("limite", Type.PrimitiveTypes.INTEIRO))))
+                    Map.entry("randi", new Declaration.Function("randi", Type.PrimitiveTypes.INTEIRO, Map.of("limite", new Declaration.Variable("limite", Type.PrimitiveTypes.INTEIRO)))),
 
+                    Map.entry("sen", new Declaration.Function("sen", Type.PrimitiveTypes.REAL, Map.of("valor", new Declaration.Variable("valor", Type.PrimitiveTypes.REAL)))),
+                    Map.entry("tan", new Declaration.Function("tan", Type.PrimitiveTypes.REAL, Map.of("valor", new Declaration.Variable("valor", Type.PrimitiveTypes.REAL))))
             ),
             Map.of("mudacor", new Declaration.Procedure("mudacor", Map.of("cor", new Declaration.Variable("cor", CARACTERE), "localizacao", new Declaration.Variable("localizacao", CARACTERE)))), Map.of(), null);
 

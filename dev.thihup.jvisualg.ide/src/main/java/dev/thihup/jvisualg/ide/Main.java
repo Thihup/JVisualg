@@ -386,7 +386,7 @@ public class Main extends Application {
 
     private static final List<String> KEYWORDS = List.of(
             "Div", "Mod", "Se", "Entao", "Então", "Senao", "Senão", "FimSe", "Para", "De", "Ate", "Até", "Passo", "FimPara", "Faca", "Faça", "Enquanto", "FimEnquanto", "Retorne", "E", "Ou", "Nao", "Não", "Escolha", "FimEscolha", "Repita", "FimRepita", "Caso", "OutroCaso",
-            "abs", "arccos", "arcsen", "arctan", "asc", "carac", "caracpnum", "compr", "copia", "cos", "cotan", "exp", "grauprad", "int", "log", "logn", "maiusc", "minusc", "numpcarac", "pos", "pi", "quad", "radpgrau", "raizq", "rand", "randi"
+            "abs", "arccos", "arcsen", "arctan", "asc", "carac", "caracpnum", "compr", "copia", "cos", "cotan", "exp", "grauprad", "int", "log", "logn", "maiusc", "minusc", "numpcarac", "pos", "pi", "quad", "radpgrau", "raizq", "rand", "randi", "sen", "tan"
 
     );
 
