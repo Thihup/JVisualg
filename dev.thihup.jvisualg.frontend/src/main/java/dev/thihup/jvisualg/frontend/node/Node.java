@@ -117,7 +117,8 @@ public sealed interface Node {
                 yield Stream.concat(nameStream, argsStream);
             }
             case DebugCommandNode debugCommandNode -> Stream.of(debugCommandNode.expr());
-            case ArquivoCommandNode _, AleatorioCommandNode _, TimerCommandNode _, PausaCommandNode _, EcoCommandNode _,
+            case AleatorioRangeNode aleatorioRangeNode -> Stream.of(aleatorioRangeNode.start(), aleatorioRangeNode.end(), aleatorioRangeNode.decimalPlaces());
+            case ArquivoCommandNode _, TimerCommandNode _, PausaCommandNode _, EcoCommandNode _,
                  CronometroCommandNode _, LimpatelaCommandNode _ -> Stream.of();
             case ArrayTypeNode(var type, CompundNode(var nodes, _), _) -> {
                 Stream<Node> typeStream = Stream.of(type);
@@ -132,7 +133,7 @@ public sealed interface Node {
             case InterrompaCommandNode _ -> Stream.of();
             case NotNode(var expr, _) -> Stream.of(expr);
             case ReturnNode(var expr, _) -> Stream.of(expr);
-            case EmptyNode _, EmptyExpressionNode _ -> Stream.of();
+            case EmptyNode _, EmptyExpressionNode _, AleatorioOffNode _, AleatorioOnNode _ -> Stream.of();
         };
         return childrenNode.mapMulti((Node element, Consumer<Node>  downstream) -> {
             downstream.accept(element);
@@ -558,9 +559,25 @@ public sealed interface Node {
         }
     }
 
-    record AleatorioCommandNode(boolean on, List<Integer> args, Optional<Location> location) implements CommandNode {
-        public AleatorioCommandNode {
-            Objects.requireNonNull(args);
+    sealed interface AleatorioNode extends CommandNode {}
+
+    record AleatorioRangeNode(ExpressionNode start, ExpressionNode end, ExpressionNode decimalPlaces, Optional<Location> location) implements AleatorioNode {
+        public AleatorioRangeNode {
+            Objects.requireNonNull(start);
+            Objects.requireNonNull(end);
+            Objects.requireNonNull(decimalPlaces);
+            Objects.requireNonNull(location);
+        }
+    }
+
+    record AleatorioOnNode(Optional<Location> location) implements AleatorioNode {
+        public AleatorioOnNode {
+            Objects.requireNonNull(location);
+        }
+    }
+
+    record AleatorioOffNode(Optional<Location> location) implements AleatorioNode {
+        public AleatorioOffNode {
             Objects.requireNonNull(location);
         }
     }
@@ -571,13 +588,13 @@ public sealed interface Node {
         }
     }
 
-    record PausaCommandNode(Node node, Optional<Location> location) implements CommandNode {
+    record PausaCommandNode(Optional<Location> location) implements CommandNode {
         public PausaCommandNode {
             Objects.requireNonNull(location);
         }
     }
 
-    record DebugCommandNode(Node expr, Optional<Location> location) implements CommandNode {
+    record DebugCommandNode(ExpressionNode expr, Optional<Location> location) implements CommandNode {
         public DebugCommandNode {
             Objects.requireNonNull(expr);
             Objects.requireNonNull(location);

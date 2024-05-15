@@ -9,7 +9,7 @@ options {
 algorithm : ALGORITMO STRING declarations INICIO commands FIM_ALGORITMO;
 
 // Declarations
-declarations : (registroDeclaration | VAR (variableDeclaration SEMICOLON?)* | subprogramDeclaration  | constantsDeclaration | dos)*;
+declarations : (registroDeclaration | VAR (variableDeclaration SEMICOLON?)* | subprogramDeclaration  | constantsDeclaration | dos | arquivoCommand)*;
 registroDeclaration : TIPO ID EQ REGISTRO variableDeclaration* FIM_REGISTRO;
 variableDeclaration :  ID (COMMA ID)* COLON type ;
 constantsDeclaration: CONST (ID EQ expr SEMICOLON?)*;
@@ -25,7 +25,6 @@ command : assignment
         | chooseCommand
         | loopCommand
         | procedureCall
-        | arquivoCommand
         | aleatorioCommand
         | timerCommand
         | pausaCommand
@@ -121,7 +120,7 @@ functionCall : ID (LPAREN exprList? RPAREN)?;
 arquivoCommand : ARQUIVO STRING;
 
 // Aleatorio command
-aleatorioCommand : ALEATORIO (ON | OFF | INT_LITERAL (COMMA INT_LITERAL)*);
+aleatorioCommand : ALEATORIO (ON? | OFF | expr (COMMA expr)* );
 
 // Timer command
 timerCommand : TIMER (ON | OFF | INT_LITERAL);

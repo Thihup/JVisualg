@@ -3,6 +3,7 @@ package dev.thihup.jvisualg.interpreter;
 import dev.thihup.jvisualg.examples.ExamplesBase;
 import dev.thihup.jvisualg.frontend.ASTResult;
 import dev.thihup.jvisualg.frontend.VisualgParser;
+import dev.thihup.jvisualg.frontend.node.Location;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -24,7 +25,7 @@ class InterpreterTest extends ExamplesBase {
         StringWriter stringWriter = new StringWriter();
         IO io = new IO(_ -> null, stringWriter::write);
         new Interpreter(io)
-            .run(VisualgParser.parse("""
+            .run("""
                 algoritmo "Teste"
                 var
                 a: inteiro
@@ -84,7 +85,7 @@ class InterpreterTest extends ExamplesBase {
                 escreval(falso)
                 escreval(a)
                 fimalgoritmo
-                """).node().get());
+                """, Executors.newVirtualThreadPerTaskExecutor());
         assertEquals(
                         """
                         Hello, World! 5
@@ -436,8 +437,8 @@ class InterpreterTest extends ExamplesBase {
     @Test
     void testRead() {
         StringWriter stringWriter = new StringWriter();
-        new Interpreter(new IO(_ -> CompletableFuture.completedFuture(new InputValue.InteiroValue(5)), stringWriter::write))
-                .run(VisualgParser.parse("""
+        Interpreter interpreter = new Interpreter(new IO(_ -> CompletableFuture.completedFuture(new InputValue.InteiroValue(5)), stringWriter::write));
+        interpreter.run("""
                 algoritmo "Teste"
                 var
                 a: inteiro
@@ -446,7 +447,7 @@ class InterpreterTest extends ExamplesBase {
                     leia(a)
                     escreval(a)
                 fimalgoritmo
-                """).node().get());
+                """, Executors.newVirtualThreadPerTaskExecutor());
         assertEquals(
                 """
                 Number: 5

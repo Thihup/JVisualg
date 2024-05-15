@@ -330,8 +330,7 @@ public class TypeChecker {
 
             case Node.FunctionCallNode functionCallNode -> handleFunctionCallNode(scope, errors, functionCallNode);
 
-            case Node.AleatorioCommandNode aleatorioCommandNode ->
-                    handleAleatorioCommandNode(errors, aleatorioCommandNode);
+            case Node.AleatorioNode aleatorioRangeNode -> handleAleatorioCommandNode(errors, aleatorioRangeNode);
 
             case Node.TimerCommandNode timerCommandNode -> handleTimerCommand(errors, timerCommandNode);
 
@@ -395,10 +394,26 @@ public class TypeChecker {
         }
     }
 
-    private static void handleAleatorioCommandNode(List<Error> errors, Node.AleatorioCommandNode aleatorioCommandNode) {
-        for (Integer arg : aleatorioCommandNode.args()) {
-            if (arg < 0) {
-                errors.add(new Error("Aleatorio command with negative argument: " + arg, aleatorioCommandNode.location().orElse(Location.EMPTY)));
+    private static void handleAleatorioCommandNode(List<Error> errors, Node.AleatorioNode aleatorioRangeNode) {
+        switch (aleatorioRangeNode) {
+            case Node.AleatorioOffNode aleatorioOffNode -> {
+
+            }
+            case Node.AleatorioOnNode aleatorioOnNode -> {
+            }
+            case Node.AleatorioRangeNode rangeNode -> {
+                Type startType = getType(rangeNode.start(), null, errors);
+                if (!areNumbers(startType, INTEIRO)) {
+                    errors.add(new Error("Aleatorio command with non-integer type: " + startType, rangeNode.start().location().orElse(Location.EMPTY)));
+                }
+                Type endType = getType(rangeNode.end(), null, errors);
+                if (!areNumbers(startType, INTEIRO)) {
+                    errors.add(new Error("Aleatorio command with non-integer type: " + endType, rangeNode.end().location().orElse(Location.EMPTY)));
+                }
+                Type type = getType(rangeNode.decimalPlaces(), null, errors);
+                if (!areNumbers(type, INTEIRO)) {
+                    errors.add(new Error("Aleatorio command with non-integer type: " + type, rangeNode.decimalPlaces().location().orElse(Location.EMPTY)));
+                }
             }
         }
     }

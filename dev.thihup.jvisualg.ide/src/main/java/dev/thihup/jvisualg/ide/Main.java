@@ -68,8 +68,11 @@ public class Main extends Application {
     private Future<Void> lspClient;
     private List<Diagnostic> diagnostics;
     private Interpreter interpreter;
+    private List<Integer> breakpointLines = new ArrayList<>();
 
     public record DebugState(String getEscopo, String getNome, String getTipo, String getValor){}
+
+    private int previousLine = -1;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -87,48 +90,65 @@ public class Main extends Application {
 
         setupLSP();
 
-        interpreter = new Interpreter(new IO(this::readVariable, this::appendOutput));
+
+        interpreter = new Interpreter(new IO(this::readVariable, this::appendOutput), programState -> {
+            Platform.runLater(() -> {
+                int lineNumber = programState.lineNumber();
+                codeArea.showParagraphAtCenter(lineNumber);
+                codeArea.getCaretSelectionBind().moveTo(lineNumber, 0);
+                if (previousLine != -1) {
+                    codeArea.setStyle(previousLine, List.of());
+                }
+                previousLine = lineNumber;
+                codeArea.setStyle(lineNumber, List.of("debug"));
+
+                debugArea.getItems().clear();
+                programState.stack().entrySet().stream()
+                        .mapMulti((Map.Entry<String, Map<String, Object>> value, Consumer<DebugState> consumer) -> {
+                            value.getValue().forEach((variableName, variableValue) -> {
+                                final String scopeName = value.getKey();
+                                switch (variableValue) {
+                                    case Object[][] multiObjects -> addMultiArrayDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, multiObjects);
+                                    case Object[] objects -> addArrayDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, objects);
+                                    case Object _ -> consumer.accept(new DebugState(scopeName.toUpperCase(), variableName.toUpperCase(), variableValue.getClass().getSimpleName(), variableValue.toString()));
+                                }
+                            });
+                        })
+                        .forEach(x -> debugArea.getItems().add(x));
+
+            });
+        });
 
         runButton.addEventHandler(ActionEvent.ACTION, _ -> {
             Platform.runLater(() -> {
+                if (interpreter.state() == Interpreter.State.PAUSED) {
+                    if (previousLine != -1) {
+                        codeArea.setStyle(previousLine, List.of());
+                    }
+                    interpreter.continueExecution();
+                    return;
+                }
                 outputArea.clear();
                 debugArea.getItems().clear();
                 outputArea.appendText("Início da execução\n");
                 interpreter.reset();
-
+                previousLine = 0;
+                breakpointLines.forEach(interpreter::addBreakpoint);
 
                 interpreter.run(codeArea.getText(), executor)
-                    .thenRun(() -> {
-                        Platform.runLater(() -> interpreter.stack.stream()
-                            .flatMap(x -> x.entrySet().stream())
-                            .mapMulti((Map.Entry<String, Object>value, Consumer<DebugState> consumer) -> {
-                                switch (value.getValue()) {
-                                    case Object[][] multiObjects -> {
-                                        for (int i = 0; i < multiObjects.length; i++) {
-                                            Object[] objects = multiObjects[i];
-                                            for (int j = 0; j < objects.length; j++) {
-                                                Object object = objects[j];
-                                                consumer.accept(new DebugState("", value.getKey()+ "["+i+", "+j+"]", object.getClass().getSimpleName(), object.toString()));
-                                            }
-                                        }
-                                    }
-                                    case Object[] objects -> {
-                                        for (int i = 0; i < objects.length; i++) {
-                                            Object object = objects[i];
-                                            consumer.accept(new DebugState("", value.getKey()+ "["+i+"]", object.getClass().getSimpleName(), object.toString()));
-                                        }
-                                    }
-                                    case Object _ -> consumer.accept(new DebugState("", value.getKey(), value.getValue().getClass().getSimpleName(), value.getValue().toString()));
-                                }
-
-                            })
-                            .forEach(x -> debugArea.getItems().add(x)));
-                        appendOutput("\nFim da execução.");
-                    })
+                    .thenRun(() -> appendOutput("\nFim da execução."))
                     .exceptionally(e -> {
+                        e.printStackTrace();
                         appendOutput(e.getCause().toString());
                         appendOutput("\nExecução terminada por erro.");
                         return null;
+                    }).whenComplete((_, _) -> {
+                        Platform.runLater(() -> {
+                            if (previousLine != -1) {
+                                codeArea.setStyle(previousLine, List.of());
+                            }
+                            previousLine = -1;
+                        });
                     });
 
             });
@@ -139,6 +159,23 @@ public class Main extends Application {
 
         if (Boolean.getBoolean("autoClose"))
             Platform.runLater(stage::close);
+    }
+
+    private static void addArrayDebug(String scope, String variableName, Consumer<DebugState> consumer, Object[] objects) {
+        for (int i = 0; i < objects.length; i++) {
+            Object object = objects[i];
+            consumer.accept(new DebugState(scope, variableName + "["+i+"]", object.getClass().getSimpleName(), object.toString()));
+        }
+    }
+
+    private static void addMultiArrayDebug(String scope, String variableName, Consumer<DebugState> consumer, Object[][] multiObjects) {
+        for (int i = 0; i < multiObjects.length; i++) {
+            Object[] objects = multiObjects[i];
+            for (int j = 0; j < objects.length; j++) {
+                Object object = objects[j];
+                consumer.accept(new DebugState(scope, variableName + "["+i+", "+j+"]", object.getClass().getSimpleName(), object.toString()));
+            }
+        }
     }
 
     private void appendOutput(String output) {
@@ -175,6 +212,19 @@ public class Main extends Application {
         scene.setOnKeyPressed(x -> {
             switch (x.getCode()) {
                 case F9 -> runButton.fire();
+                case F8 -> {
+                    switch (interpreter.state()) {
+                        case PAUSED -> {
+                            interpreter.step();
+                        }
+                        case STOPPED -> {
+                            breakpointLines.addLast(1);
+                            runButton.fire();
+                        }
+                        case RUNNING  -> {
+                        }
+                    }
+                }
                 default -> {}
             }
         });

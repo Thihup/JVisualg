@@ -479,9 +479,22 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitAleatorioCommand(VisuAlgParser.AleatorioCommandContext ctx) {
-        boolean on = ctx.ON() != null;
-        List<Integer> args = ctx.INT_LITERAL().stream().map(TerminalNode::getText).map(Integer::parseInt).toList();
-        return new AleatorioCommandNode(on, args, fromRuleContext(ctx));
+        if (ctx.OFF() != null) {
+            return new AleatorioOffNode(fromRuleContext(ctx));
+        }
+        switch (ctx.expr().size()) {
+            case 1 -> {
+                return new AleatorioRangeNode(EmptyExpressionNode.INSTANCE, visitExpr(ctx.expr(0)), EmptyExpressionNode.INSTANCE, fromRuleContext(ctx));
+            }
+            case 2 -> {
+                return new AleatorioRangeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), EmptyExpressionNode.INSTANCE, fromRuleContext(ctx));
+            }
+            case 3 -> {
+                return new AleatorioRangeNode(visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)), visitExpr(ctx.expr(2)), fromRuleContext(ctx));
+            }
+            default -> {}
+        }
+        return new AleatorioOnNode(fromRuleContext(ctx));
     }
 
 
@@ -495,13 +508,13 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitPausaCommand(VisuAlgParser.PausaCommandContext ctx) {
-        return new PausaCommandNode(EmptyNode.INSTANCE, fromRuleContext(ctx));
+        return new PausaCommandNode(fromRuleContext(ctx));
     }
 
 
     @Override
     public Node visitDebugCommand(VisuAlgParser.DebugCommandContext ctx) {
-        return new DebugCommandNode(visit(ctx.expr()), fromRuleContext(ctx));
+        return new DebugCommandNode(visitExpr(ctx.expr()), fromRuleContext(ctx));
     }
 
 

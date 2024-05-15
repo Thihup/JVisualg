@@ -43,3 +43,7 @@
 .dataType {
     -fx-fill: #8b0000;
 }
+
+.debug {
+    -rtfx-background-color: lightblue;
+}

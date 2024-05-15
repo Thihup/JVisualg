@@ -2,52 +2,107 @@ package dev.thihup.jvisualg.interpreter;
 
 import dev.thihup.jvisualg.frontend.ASTResult;
 import dev.thihup.jvisualg.frontend.VisualgParser;
+import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.*;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 
 public class Interpreter {
 
-    public final ArrayDeque<Map<String, Object>> stack = new ArrayDeque<>();
+    public final SequencedMap<String, Map<String, Object>> stack = new LinkedHashMap<>();
     private final Map<String, Node.FunctionDeclarationNode> functions = new LinkedHashMap<>();
     private final Map<String, Node.ProcedureDeclarationNode> procedures = new LinkedHashMap<>();
     private final RandomGenerator random = RandomGenerator.getDefault();
     private final IO io;
+    private final Consumer<ProgramState> debuggerCallback;
 
-    private boolean aleatorio;
+    private AleatorioState aleatorio = AleatorioState.Off.INSTANCE;
     private boolean eco = true;
+    private List<Integer> breakpoints = new ArrayList<>();
 
+    public enum State {
+        RUNNING,
+        PAUSED,
+        STOPPED
+    }
+    private State state = State.STOPPED;
+
+    private sealed interface AleatorioState {
+        record Range(int start, int end, int decimalPlaces) implements AleatorioState {}
+        record Off() implements AleatorioState {
+            static final Off INSTANCE = new Off();
+        }
+    }
+
+
+    public record ProgramState(int lineNumber, Map<String, Map<String, Object>> stack) {
+    }
+
+    public Interpreter(IO io, Consumer<ProgramState> debuggerCallback) {
+        this.io = io;
+        this.debuggerCallback = debuggerCallback;
+    }
 
     public Interpreter(IO io) {
-        this.io = io;
+        this(io, null);
+    }
+
+    public void addBreakpoint(int location) {
+        this.breakpoints.add(location);
     }
 
     public void reset() {
         stack.clear();
         functions.clear();
         procedures.clear();
-        stack.push(new HashMap<>());
+        stack.clear();
+        breakpoints.clear();
+        state = State.STOPPED;
+    }
+
+    public State state() {
+        return state;
     }
 
     public CompletableFuture<Void> run(String code, ExecutorService executorService) {
-
+        state = State.RUNNING;
         ASTResult parse = VisualgParser.parse(code);
+        CompletableFuture<Void> execution;
         if (parse.node().isPresent())
-            return CompletableFuture.runAsync(() -> run(parse.node().get()), executorService);
-        else
-            return CompletableFuture.failedFuture(new Exception("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n"))));
+            execution = CompletableFuture.runAsync(() -> run(parse.node().get()), executorService);
+        else {
+            Exception ex = new Exception("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n")));
+            execution = CompletableFuture.failedFuture(ex);
+        }
+        return execution.whenComplete((_, _) -> {
+            if (debuggerCallback != null)
+                debuggerCallback.accept(new ProgramState(0, Map.copyOf(stack)));
+            state = State.STOPPED;
+        });
     }
 
-    public void run(Node node) {
+    private void run(Node node) {
         try {
+            if (state != State.PAUSED && breakpoints.stream().anyMatch(x -> x == node.location().orElse(Location.EMPTY).startLine()) && !(node instanceof Node.CompundNode<?>)) {
+                state = State.PAUSED;
+            }
+
+            if (state == State.PAUSED) {
+                handleDebugCommand(node);
+            }
+
             switch (node) {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
                 case Node.ArrayTypeNode _ -> throw new UnsupportedOperationException("ArrayTypeNode not implemented");
@@ -62,13 +117,49 @@ public class Interpreter {
                 case Node.VariableDeclarationNode variableDeclarationNode -> runVariableDeclaration(variableDeclarationNode);
                 case Node.ExpressionNode e -> evaluate(e);
             }
-        } catch (InterruptedException | IOException _) {
+        } catch (InterruptedException | IOException | BrokenBarrierException _) {
+            state = State.STOPPED;
+        }
+    }
 
+    CyclicBarrier lock = new CyclicBarrier(2);
+
+    public void step() {
+        try {
+            if (state == State.PAUSED) {
+                lock.await();
+                state = State.PAUSED;
+            }
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void continueExecution() {
+        try {
+            if (state == State.PAUSED) {
+                lock.await();
+                state = State.RUNNING;
+            }
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void handleDebugCommand(Node node) throws BrokenBarrierException, InterruptedException {
+        System.out.println("Breakpoint hit at line " + node.location().orElse(Location.EMPTY));
+        if (debuggerCallback != null) {
+            debuggerCallback.accept(new ProgramState(node.location().orElse(Location.EMPTY).startLine() - 1, Map.copyOf(stack)));
+            lock.await();
+            lock.reset();
+        }
+        else {
+            continueExecution();
         }
     }
 
     private void runConstant(Node.ConstantNode constantNode) {
-        stack.element().put(constantNode.name().id(), evaluate(constantNode.value()));
+        stack.lastEntry().getValue().put(constantNode.name().id(), evaluate(constantNode.value()));
     }
 
     private void runSubprogramDeclaration(Node.SubprogramDeclarationNode subprogramDeclarationNode) {
@@ -78,9 +169,9 @@ public class Interpreter {
         }
     }
 
-    private void runCommand(Node.CommandNode commandNode) throws IOException, InterruptedException {
+    private void runCommand(Node.CommandNode commandNode) throws IOException, InterruptedException, BrokenBarrierException {
         switch (commandNode) {
-            case Node.AleatorioCommandNode aleatorioCommandNode -> aleatorio = aleatorioCommandNode.on();
+            case Node.AleatorioNode aleatorioNode -> runAleatorio(aleatorioNode);
             case Node.ArquivoCommandNode _ -> throw new UnsupportedOperationException("ArquivoCommandNode not implemented");
             case Node.AssignmentNode assignmentNode -> runAssignment(assignmentNode);
             case Node.ChooseCaseNode _ -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
@@ -111,28 +202,31 @@ public class Interpreter {
             }
             case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
             case Node.CronometroCommandNode _ -> {}
-            case Node.DebugCommandNode _ -> throw new UnsupportedOperationException("DebugCommandNode not implemented");
+            case Node.DebugCommandNode debugCommandNode -> runDebugCommand(debugCommandNode);
             case Node.EcoCommandNode ecoCommandNode -> eco = ecoCommandNode.on();
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
             case Node.IncrementNode _ -> throw new UnsupportedOperationException("IncrementNode not implemented");
             case Node.InterrompaCommandNode _ -> throw new BreakException();
             case Node.LimpatelaCommandNode _ -> {}
-            case Node.PausaCommandNode _ -> {}
+            case Node.PausaCommandNode _ -> {
+                state = State.PAUSED;
+                handleDebugCommand(commandNode);
+            }
             case Node.ProcedureCallNode procedureCallNode -> {
                 Node.ProcedureDeclarationNode procedureDeclaration = procedures.get(procedureCallNode.name().id());
                 if (procedureDeclaration != null) {
-                    stack.push(new HashMap<>());
+                    stack.put(procedureCallNode.name().id(), new HashMap<>());
                     List<Node> parameters = procedureDeclaration.parameters().nodes();
                     List<Node.ExpressionNode> arguments = procedureCallNode.args().nodes();
                     if (parameters.size() != arguments.size()) {
                         throw new UnsupportedOperationException("Expected " + parameters.size() + " arguments but got " + arguments.size());
                     }
                     for (int i = 0; i < arguments.size(); i++){
-                        stack.element().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
+                        stack.lastEntry().getValue().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
                     }
                     run(procedureDeclaration.declarations());
                     run(procedureDeclaration.commands());
-                    stack.pop();
+                    stack.pollLastEntry();
                 } else if (procedureCallNode.name().id().equals("mudacor")) {
                 } else {
                     throw new UnsupportedOperationException("Procedure not found: " + procedureCallNode.name().id());
@@ -141,13 +235,29 @@ public class Interpreter {
             }
             case Node.ReadCommandNode readCommandNode -> runReadCommand(readCommandNode);
             case Node.ReturnNode returnNode -> {
-                stack.element().put("(RESULTADO)", evaluate(returnNode.expr()));
+                stack.lastEntry().getValue().put("(RESULTADO)", evaluate(returnNode.expr()));
                 throw new ReturnException();
             }
             case Node.TimerCommandNode _ -> {}
             case Node.WhileCommandNode whileCommandNode -> runWhileCommand(whileCommandNode);
             case Node.WriteCommandNode writeCommandNode -> runWriteCommandNode(writeCommandNode);
             case Node.WriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision, _) -> runWriteItemNode(expr, spaces, precision);
+        }
+    }
+
+    private void runAleatorio(Node.AleatorioNode aleatorioNode) {
+        switch (aleatorioNode) {
+            case Node.AleatorioOffNode _ -> aleatorio = AleatorioState.Off.INSTANCE;
+            case Node.AleatorioOnNode _ -> aleatorio = new AleatorioState.Range(0, 100, 0);
+            case Node.AleatorioRangeNode aleatorioRangeNode ->
+                    aleatorio = new AleatorioState.Range(evaluate(aleatorioRangeNode.start()), evaluate(aleatorioRangeNode.end()), evaluate(aleatorioRangeNode.decimalPlaces()));
+        }
+    }
+
+    private void runDebugCommand(Node.DebugCommandNode debugCommandNode) throws BrokenBarrierException, InterruptedException {
+        if (evaluate(debugCommandNode.expr())) {
+            state = State.PAUSED;
+            handleDebugCommand(debugCommandNode);
         }
     }
 
@@ -171,7 +281,7 @@ public class Interpreter {
             case Node.IdNode idNode -> assignVariable(idNode.id(), evaluate);
             case Node.ArrayAccessNode arrayAccessNode -> {
                 Node node = arrayAccessNode.node();
-                Object o = evaluateVariableOrFunction((Node.IdNode) node);
+                Object o = evaluateVariableOrFunction(getIdentifierForArray(node));
                 Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
                 switch(indexes.nodes().size()) {
                     case 1 -> {
@@ -236,19 +346,20 @@ public class Interpreter {
     }
 
     private void runReadCommand(Node.ReadCommandNode readCommandNode) {
-
+        boolean aleatorioEnabled = aleatorio != AleatorioState.Off.INSTANCE;
         readCommandNode.exprList().nodes().forEach(expr -> {
             switch (expr) {
                 case Node.IdNode idNode -> {
                     Object o = evaluateVariableOrFunction(idNode);
-                    final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass()))).join();
+
+                    final InputValue inputValue = aleatorioEnabled ? null : io.input().apply(new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass()))).join();
                     Object value = switch (o) {
-                        case Boolean _ when aleatorio -> random.nextBoolean();
-                        case String _ when aleatorio -> random.ints(65, 91)
+                        case Boolean _ when aleatorioEnabled -> random.nextBoolean();
+                        case String _ when aleatorioEnabled -> random.ints(65, 91)
                                 .limit(5)
                                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
-                        case Double _ when aleatorio -> random.nextDouble(100);
-                        case Integer _ when aleatorio -> random.nextInt(100);
+                        case Double[] _ when aleatorio instanceof AleatorioState.Range range -> generateRandomDouble(range);
+                        case Integer[] _ when aleatorio instanceof AleatorioState.Range(var start, var end, _) -> random.nextInt(start, end);
 
                         case Integer _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
                         case Double _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
@@ -263,20 +374,20 @@ public class Interpreter {
                     assignVariable(idNode.id(), value);
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
-                    Node.IdNode node = (Node.IdNode) arrayAccessNode.node();
+                    Node.IdNode node = getIdentifierForArray(arrayAccessNode.node());
                     Object o = evaluateVariableOrFunction(node);
 
                     Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
                     switch(indexes.nodes().size()) {
                         case 1 -> {
                             int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
-                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType()))).join();
+                            final InputValue inputValue = aleatorioEnabled ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType()))).join();
                             Array.set(o, index, readValueForArray(o, inputValue));
                         }
                         case 2 -> {
                             int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                             int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
-                            final InputValue inputValue = aleatorio ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType()))).join();
+                            final InputValue inputValue = aleatorioEnabled ? null : io.input().apply(new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType()))).join();
                             Array.set(Array.get(o, index1), index2, readValueForArray(Array.get(o, index1), inputValue));
                         }
                         default -> throw new UnsupportedOperationException("Unsupported number of indexes: " + indexes.nodes().size());
@@ -288,14 +399,23 @@ public class Interpreter {
 
     }
 
+    private static Node.IdNode getIdentifierForArray(Node arrayAccessNode) {
+        return switch (arrayAccessNode) {
+            case Node.ArrayAccessNode nestedAccess -> getIdentifierForArray(nestedAccess.node());
+            case Node.IdNode idNode -> idNode;
+            default -> throw new IllegalStateException("Unexpected value: " + arrayAccessNode);
+        };
+    }
+
     private Object readValueForArray(Object o, InputValue inputValue) {
+        boolean aleatorioEnabled = aleatorio != AleatorioState.Off.INSTANCE;
         Object o1 = switch (o) {
-            case Boolean[] _ when aleatorio -> random.nextBoolean();
-            case String[] _ when aleatorio -> random.ints(65, 91)
+            case Boolean[] _ when aleatorioEnabled -> random.nextBoolean();
+            case String[] _ when aleatorioEnabled -> random.ints(65, 91)
                     .limit(5)
                     .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append);
-            case Double[] _ when aleatorio -> random.nextDouble(100);
-            case Integer[] _ when aleatorio -> random.nextInt(100);
+            case Double[] _ when aleatorio instanceof AleatorioState.Range range -> generateRandomDouble(range);
+            case Integer[] _ when aleatorio instanceof AleatorioState.Range(var start, var end, _) -> random.nextInt(start, end);
 
             case Integer[] _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
             case Double[] _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
@@ -308,8 +428,20 @@ public class Interpreter {
         return o1;
     }
 
+    private double generateRandomDouble(AleatorioState.Range range) {
+        double v = random.nextDouble(range.start(), range.end());
+
+        if (range.decimalPlaces == 0) {
+            return (int) v;
+        }
+        BigDecimal bd = new BigDecimal(v);
+        bd = bd.setScale(range.decimalPlaces, RoundingMode.HALF_UP);
+        return bd.doubleValue();
+
+    }
+
     private Object evaluateVariableOrFunction(Node.IdNode idNode) {
-        return stack.stream().filter(m -> m.containsKey(idNode.id())).map(m -> m.get(idNode.id())).findFirst()
+        return stack.values().stream().filter(m -> m.containsKey(idNode.id())).map(m -> m.get(idNode.id())).findFirst()
                 .or(() -> Optional.ofNullable(functions.get(idNode.id())).map(_ -> new Node.FunctionCallNode(idNode, Node.CompundNode.empty(), Optional.empty())).map(this::evaluateFunction))
             .orElseThrow(() -> new UnsupportedOperationException("Variable not found: " + idNode.id()));
     }
@@ -422,8 +554,7 @@ public class Interpreter {
     }
 
     private Object evaluateArrayAccessNode(Node.ArrayAccessNode arrayAccessNode) {
-        Node node = arrayAccessNode.node();
-        Object o = evaluateVariableOrFunction((Node.IdNode) node);
+        Object o = evaluateVariableOrFunction(getIdentifierForArray(arrayAccessNode.node()));
 
         Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
         switch(indexes.nodes().size()) {
@@ -443,23 +574,23 @@ public class Interpreter {
     private Object evaluateFunction(Node.FunctionCallNode functionCallNode) {
         Node.FunctionDeclarationNode functionDeclaration = functions.get(functionCallNode.name().id());
         if (functionDeclaration != null) {
-            stack.push(new HashMap<>());
-            stack.element().put("(RESULTADO)", newInstance(functionDeclaration.returnType()));
+            stack.putLast(functionCallNode.name().id(), new HashMap<>());
+            stack.lastEntry().getValue().put("(RESULTADO)", newInstance(functionDeclaration.returnType()));
             List<Node> parameters = functionDeclaration.parameters().nodes();
             List<Node.ExpressionNode> arguments = functionCallNode.args().nodes();
             if (parameters.size() != arguments.size()) {
                 throw new UnsupportedOperationException("Expected " + parameters.size() + " arguments but got " + arguments.size());
             }
             for (int i = 0; i < arguments.size(); i++){
-                stack.element().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
+                stack.lastEntry().getValue().put(((Node.VariableDeclarationNode) parameters.get(i)).name().id(), evaluate(arguments.get(i)));
             }
             run(functionDeclaration.declarations());
             try {
                 run(functionDeclaration.commands());
             } catch (ReturnException _) {
             }
-            Object result = stack.element().get("(RESULTADO)");
-            stack.pop();
+            Object result = stack.lastEntry().getValue().get("(RESULTADO)");
+            stack.pollLastEntry();
             return result;
         } else if (StandardFunctions.FUNCTIONS.containsKey(functionCallNode.name().id())) {
             try {
@@ -672,17 +803,17 @@ public class Interpreter {
     }
 
     private void runAlgoritmo(Node.AlgoritimoNode algoritimoNode) throws InterruptedException {
-        stack.push(new HashMap<>());
+        stack.putLast("GLOBAL", new HashMap<>());
         run(algoritimoNode.declarations());
         run(algoritimoNode.commands());
     }
 
     private void runVariableDeclaration(Node.VariableDeclarationNode variableDeclarationNode) {
-        stack.element().put(variableDeclarationNode.name().id(), newInstance(variableDeclarationNode.type()));
+        stack.lastEntry().getValue().put(variableDeclarationNode.name().id(), newInstance(variableDeclarationNode.type()));
     }
 
     private void assignVariable(String name, Object value) {
-        stack.stream().filter(m -> m.containsKey(name)).findFirst().ifPresentOrElse(m -> m.put(name, value), () -> {
+        stack.values().stream().filter(m -> m.containsKey(name)).findFirst().ifPresentOrElse(m -> m.put(name, value), () -> {
             throw new UnsupportedOperationException("Variable not found: " + name);
         });
     }
