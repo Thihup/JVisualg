@@ -432,6 +432,7 @@ public class Interpreter {
     private Object evaluateVariableOrFunction(Node.IdNode idNode) {
         return stack.reversed().values().stream().filter(m -> m.containsKey(idNode.id())).map(m -> m.get(idNode.id())).findFirst()
                 .or(() -> Optional.ofNullable(functions.get(idNode.id())).map(_ -> new Node.FunctionCallNode(idNode, Node.CompundNode.empty(), Optional.empty())).map(this::evaluateFunction))
+                .or(() -> Optional.ofNullable(StandardFunctions.FUNCTIONS.get(idNode.id())).map(_ -> new Node.FunctionCallNode(idNode, Node.CompundNode.empty(), Optional.empty())).map(this::evaluateFunction))
             .orElseThrow(() -> new UnsupportedOperationException("Variable not found: " + idNode.id()));
     }
 

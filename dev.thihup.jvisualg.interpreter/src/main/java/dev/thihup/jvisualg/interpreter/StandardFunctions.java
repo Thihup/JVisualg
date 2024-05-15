@@ -87,10 +87,10 @@ public class StandardFunctions {
     }
 
     private static int asc(String s) {
-        return s.charAt(0);
+        return s.codePointAt(0);
     }
     private static String carac(Number c) {
-        return "" + c;
+        return Character.toString(c.intValue());
     }
     private static int caracpnum(String c) {
         return Integer.parseInt(c);
