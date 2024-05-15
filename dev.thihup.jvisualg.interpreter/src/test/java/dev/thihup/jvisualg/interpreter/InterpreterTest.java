@@ -82,7 +82,7 @@ class InterpreterTest extends ExamplesBase {
                 escreval(falso)
                 escreval(a)
                 fimalgoritmo
-                """, Executors.newVirtualThreadPerTaskExecutor());
+                """, Executors.newVirtualThreadPerTaskExecutor()).join();
         assertEquals(
                         """
                         Hello, World! 5
@@ -444,7 +444,8 @@ class InterpreterTest extends ExamplesBase {
                     leia(a)
                     escreval(a)
                 fimalgoritmo
-                """, Executors.newVirtualThreadPerTaskExecutor());
+                """, Executors.newVirtualThreadPerTaskExecutor()).join();
+
         assertEquals(
                 """
                 Number: 5
