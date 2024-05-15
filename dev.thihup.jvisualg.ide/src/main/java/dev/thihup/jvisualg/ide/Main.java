@@ -29,7 +29,7 @@ import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.reactfx.Subscription;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.time.Duration;

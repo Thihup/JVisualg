@@ -22,7 +22,8 @@ public class ExamplesBase {
         URI start = ExamplesBase.class.getResource(folder).toURI();
         try {
             FileSystem fileSystem = FileSystems.newFileSystem(start, Map.of());
-            return Files.walk(fileSystem.getPath("/"));
+            return Files.walk(fileSystem.getPath(ExamplesBase.class.getPackageName().replace('.', '/') + "/" + folder))
+                .filter(Files::isRegularFile);
         } catch (Exception e) {
             return Files.walk(Path.of(start))
                     .filter(Files::isRegularFile);
