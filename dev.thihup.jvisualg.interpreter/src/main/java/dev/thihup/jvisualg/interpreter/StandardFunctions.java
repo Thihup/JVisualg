@@ -3,10 +3,8 @@ package dev.thihup.jvisualg.interpreter;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.random.RandomGenerator;
-import java.util.stream.Collectors;
 
 public class StandardFunctions {
     private static final MethodHandle ABS;
