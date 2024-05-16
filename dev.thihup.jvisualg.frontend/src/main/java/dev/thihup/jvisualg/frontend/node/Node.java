@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public sealed interface Node {
@@ -128,7 +127,6 @@ public sealed interface Node {
             case AssignmentNode assignmentNode ->
                     Stream.of(assignmentNode.idOrArray(), assignmentNode.expr());
             case DosNode _, IdNode _ -> Stream.of();
-            case IncrementNode(var expr, var value, _) -> Stream.of(expr, value);
             case InterrompaCommandNode _ -> Stream.of();
             case NotNode(var expr, _) -> Stream.of(expr);
             case ReturnNode(var expr, _) -> Stream.of(expr);
@@ -268,14 +266,6 @@ public sealed interface Node {
 
     record DosNode(Optional<Location> location) implements Node {
         public DosNode {
-            Objects.requireNonNull(location);
-        }
-    }
-
-    record IncrementNode(Node expr, Node value, Optional<Location> location) implements CommandNode {
-        public IncrementNode {
-            Objects.requireNonNull(expr);
-            Objects.requireNonNull(value);
             Objects.requireNonNull(location);
         }
     }

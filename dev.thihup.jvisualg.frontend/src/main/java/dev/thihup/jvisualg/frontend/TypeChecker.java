@@ -268,8 +268,6 @@ public class TypeChecker {
 
             case Node.DosNode dosNode -> handleDosNode(scope, errors, dosNode);
 
-            case Node.IncrementNode incrementNode -> handleIncrementNode(scope, errors, incrementNode);
-
             case Node.AssignmentNode assignmentNode -> handleAssignmentNode(scope, errors, assignmentNode);
 
             case Node.ForCommandNode forCommandNode -> handleForCommand(scope, errors, forCommandNode);
@@ -633,13 +631,6 @@ public class TypeChecker {
 
         if (!areTypesCompatible(idType, exprType)) {
             errors.add(new Error("Assignment of different types: " + idType + " and " + exprType, assignmentNode.expr().location().orElse(Location.EMPTY)));
-        }
-    }
-
-    private static void handleIncrementNode(Scope scope, List<Error> errors, Node.IncrementNode incrementNode) {
-        Type type = getType(incrementNode.expr(), scope, errors);
-        if (type instanceof PrimitiveTypes) {
-            errors.add(new Error("Increment command on a primitive type: " + type, incrementNode.location().orElse(Location.EMPTY)));
         }
     }
 

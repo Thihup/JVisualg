@@ -55,10 +55,6 @@ public class JavaBackend {
             case Node.AssignmentNode(Node idOrArray, Node expr, _) ->
                     "%s = %s;".formatted(javaOutput(idOrArray), javaOutput(expr));
 
-            case Node.IncrementNode(Node expr, Node value, _) ->
-                    "%s += %s".formatted(javaOutput(expr), javaOutput(value));
-
-
             case Node.ForCommandNode(Node.IdNode identifier, Node startValue, Node endValue, Node step, var commands, _) -> {
                 yield """
                         for (%s = %s; %s <= %s; %s += %s) {

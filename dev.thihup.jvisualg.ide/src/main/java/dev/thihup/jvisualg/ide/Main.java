@@ -1,9 +1,6 @@
 package dev.thihup.jvisualg.ide;
 
-import dev.thihup.jvisualg.interpreter.IO;
-import dev.thihup.jvisualg.interpreter.InputRequestValue;
-import dev.thihup.jvisualg.interpreter.InputValue;
-import dev.thihup.jvisualg.interpreter.Interpreter;
+import dev.thihup.jvisualg.interpreter.*;
 import dev.thihup.jvisualg.lsp.VisualgLauncher;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -138,8 +135,12 @@ public class Main extends Application {
                 interpreter.run(codeArea.getText(), executor)
                     .thenRun(() -> appendOutput("\nFim da execução."))
                     .exceptionally(e -> {
-                        e.printStackTrace();
-                        appendOutput(e.getCause().toString());
+                        if (e.getCause() instanceof TypeException) {
+                            appendOutput(e.getCause().getMessage());
+                        } else if (e.getCause() != null) {
+                            e.printStackTrace();
+                            appendOutput(e.getCause().toString());
+                        }
                         appendOutput("\nExecução terminada por erro.");
                         return null;
                     }).whenComplete((_, _) -> {
