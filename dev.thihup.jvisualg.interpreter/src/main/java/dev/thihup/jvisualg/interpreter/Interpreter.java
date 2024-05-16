@@ -188,7 +188,7 @@ public class Interpreter {
                                  }
                              }
                              case Node.ExpressionNode e -> {
-                                 if ((Boolean) evaluate(new Node.EqNode(test, e, Optional.empty()))) {
+                                 if (evaluate(new Node.EqNode(test, e, Optional.empty()))) {
                                      run(chooseCaseNode.commands());
                                      return;
                                  }
@@ -314,7 +314,7 @@ public class Interpreter {
                     run(whileCommandNode.commands());
                 } while (!(Boolean) evaluate(whileCommandNode.test()));
             } else {
-                while ((Boolean) evaluate(whileCommandNode.test())) {
+                while (evaluate(whileCommandNode.test())) {
                     run(whileCommandNode.commands());
                 }
             }
@@ -324,7 +324,7 @@ public class Interpreter {
 
     private void runConditionalCommand(Node.ConditionalCommandNode conditionalCommandNode) {
         if (conditionalCommandNode instanceof Node.ConditionalCommandNode(Node.ExpressionNode expressionNode, Node.CompundNode<Node.CommandNode> command, Node.CompundNode<Node.CommandNode> elseCommand, _)) {
-            if ((Boolean) evaluate(expressionNode)) {
+            if (evaluate(expressionNode)) {
                 run(command);
             } else {
                 run(elseCommand);
@@ -529,17 +529,21 @@ public class Interpreter {
             case Node.IntLiteralNode(var value, _) -> value;
             case Node.RealLiteralNode(var value, _) -> value;
             case Node.IdNode idNode -> evaluateVariableOrFunction(idNode);
-            case Node.NegNode nedNode -> switch (evaluate(nedNode.expr())) {
-                case Double x -> -x;
-                case Integer x -> -x;
-                case Object o -> throw new UnsupportedOperationException("unsupported neg node types: " + o);
-            };
+            case Node.NegNode nedNode -> evaluateNegNode(nedNode);
             case Node.PosNode(Node.ExpressionNode e, _) -> evaluate(e);
             case Node.NotNode notNode -> !(Boolean) evaluate(notNode.expr());
             case Node.EmptyExpressionNode _ -> 0;
             case Node.ArrayAccessNode arrayAccessNode -> evaluateArrayAccessNode(arrayAccessNode);
             case Node.MemberAccessNode _ -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
             case Node.RangeNode _ -> throw new UnsupportedOperationException("RangeNode not implemented");
+        };
+    }
+
+    private Object evaluateNegNode(Node.NegNode nedNode) {
+        return switch (evaluate(nedNode.expr())) {
+            case Double d -> -d;
+            case Integer i -> -i;
+            case null, default -> throw new UnsupportedOperationException("Unsupported type: " + nedNode.expr().getClass());
         };
     }
 
@@ -567,7 +571,8 @@ public class Interpreter {
             return callSubprogram(functionCallNode, functionDeclaration);
         } else if (StandardFunctions.FUNCTIONS.containsKey(functionCallNode.name().id())) {
             try {
-                return StandardFunctions.FUNCTIONS.get(functionCallNode.name().id()).invokeWithArguments(functionCallNode.args().nodes().stream().map(this::evaluate).toList());
+                return StandardFunctions.FUNCTIONS.get(functionCallNode.name().id())
+                    .invokeWithArguments(functionCallNode.args().nodes().stream().map(this::evaluate).toList());
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
