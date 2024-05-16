@@ -11,5 +11,8 @@
 
     <artifactId>dev.thihup.jvisualg.examples</artifactId>
 
+    <properties>
+        <project.build.sourceEncoding>ISO_8859_1</project.build.sourceEncoding>
+    </properties>
 
 </project>

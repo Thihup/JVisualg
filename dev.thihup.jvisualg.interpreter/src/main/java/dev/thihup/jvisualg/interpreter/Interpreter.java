@@ -26,6 +26,7 @@ public class Interpreter {
     public final SequencedMap<String, Map<String, Object>> stack = new LinkedHashMap<>();
     private final Map<String, Node.FunctionDeclarationNode> functions = new LinkedHashMap<>();
     private final Map<String, Node.ProcedureDeclarationNode> procedures = new LinkedHashMap<>();
+    private final Map<String, UserDefinedType> userDefinedTypeMap = new LinkedHashMap<>();
     private final RandomGenerator random = RandomGenerator.getDefault();
     private final IO io;
     private final Consumer<ProgramState> debuggerCallback;
@@ -113,7 +114,7 @@ public class Interpreter {
                 case Node.ConstantNode constantNode -> runConstant(constantNode);
                 case Node.DosNode _ -> {}
                 case Node.EmptyNode _ -> {}
-                case Node.RegistroDeclarationNode _ -> throw new UnsupportedOperationException("RegistroDeclarationNode not implemented");
+                case Node.RegistroDeclarationNode registroDeclarationNode -> runRegistroDeclaration(registroDeclarationNode);
                 case Node.SubprogramDeclarationNode subprogramDeclarationNode -> runSubprogramDeclaration(subprogramDeclarationNode);
                 case Node.TypeNode _ -> throw new UnsupportedOperationException("TypeNode not implemented");
                 case Node.VariableDeclarationNode variableDeclarationNode -> runVariableDeclaration(variableDeclarationNode);
@@ -122,6 +123,15 @@ public class Interpreter {
         } catch (InterruptedException | IOException | BrokenBarrierException _) {
             state = State.STOPPED;
         }
+    }
+
+    private void runRegistroDeclaration(Node.RegistroDeclarationNode registroDeclarationNode) {
+        Node.IdNode name = registroDeclarationNode.name();
+
+        Map<String, Node.TypeNode> fields = registroDeclarationNode.variableDeclarationContexts().nodes().stream()
+            .collect(Collectors.toMap(x -> x.name().id(), Node.VariableDeclarationNode::type));
+
+        userDefinedTypeMap.put(name.id(), new UserDefinedType(name.id(), fields));
     }
 
     CyclicBarrier lock = new CyclicBarrier(2);
@@ -301,6 +311,33 @@ public class Interpreter {
                 }
 
             }
+            case Node.MemberAccessNode memberAccessNode -> {
+                Object evaluateMember = evaluate(memberAccessNode.node());
+                if (!(evaluateMember instanceof UserDefinedValue userDefinedValue)) {
+                    throw new UnsupportedOperationException("Unsupported type: " + evaluate.getClass());
+                }
+                if (!(memberAccessNode.member() instanceof Node.IdNode idNode)) {
+                    throw new UnsupportedOperationException("Unsupported type: " + memberAccessNode.member().getClass());
+                }
+                UserDefinedType userDefinedType = userDefinedValue.type();
+                Node.TypeNode typeNode = userDefinedType.fields().get(idNode.id());
+                if (typeNode == null) {
+                    throw new TypeException.VariableNotFound(idNode.id());
+                }
+
+                Class<?> variableClass = getType(userDefinedValue.type().fields().get(idNode.id()));
+                Class<?> valueClass = evaluate.getClass();
+                Object valueToAssign = evaluate;
+                if (variableClass != valueClass) {
+                    if (variableClass == Double.class && valueClass == Integer.class) {
+                        valueToAssign = ((Number) evaluate).doubleValue();
+                    } else {
+                        throw new TypeException.InvalidAssignment(variableClass, valueClass);
+                    }
+                }
+
+                userDefinedValue.values().put(idNode.id(), valueToAssign);
+            }
             case null, default -> throw new UnsupportedOperationException("Unsupported type: " + assignmentNode);
         }
     }
@@ -345,27 +382,8 @@ public class Interpreter {
             switch (expr) {
                 case Node.IdNode idNode -> {
                     Object o = evaluateVariableOrFunction(idNode);
-
                     InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass()));
-                    InputValue inputValue = aleatorioEnabled ? null : io.input().apply(inputRequest).join();
-                    Object value = switch (o) {
-                        case Boolean _ when aleatorioEnabled -> random.nextBoolean();
-                        case String _ when aleatorioEnabled -> random.ints(65, 91)
-                                .limit(5)
-                                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
-                        case Double _ when aleatorio instanceof AleatorioState.Range range -> generateRandomDouble(range);
-                        case Integer _ when aleatorio instanceof AleatorioState.Range(var start, var end, _) -> random.nextInt(start, end);
-
-                        case Integer _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
-                        case Double _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
-                        case String _ when inputValue instanceof InputValue.CaracterValue(var value1) -> value1;
-                        case Boolean _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
-
-                        default -> throw new TypeException.MissingInput(inputRequest);
-                    };
-                    if (eco)
-                        io.output().accept(value + "\n");
-
+                    Object value = readValue(inputRequest, o, aleatorioEnabled);
                     assignVariable(idNode.id(), value, AssignContext.SIMPLE);
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
@@ -390,10 +408,50 @@ public class Interpreter {
                         default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
                     }
                 }
+                case Node.MemberAccessNode(Node.ExpressionNode node, Node member, Optional<Location> location) -> {
+                    Object evaluate = evaluate(node);
+                    if (!(evaluate instanceof UserDefinedValue userDefinedValue)) {
+                        throw new UnsupportedOperationException("Unsupported type: " + evaluate.getClass());
+                    }
+                    if (!(member instanceof Node.IdNode idNode)) {
+                        throw new UnsupportedOperationException("Unsupported type: " + member.getClass());
+                    }
+                    UserDefinedType userDefinedType = userDefinedValue.type();
+                    Node.TypeNode typeNode = userDefinedType.fields().get(idNode.id());
+                    if (typeNode == null) {
+                        throw new TypeException.VariableNotFound(idNode.id());
+                    }
+                    Class<?> type = getType(typeNode);
+                    InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(type));
+                    Object value = readValue(inputRequest, userDefinedValue.values().get(idNode.id()), aleatorioEnabled);
+                    userDefinedValue.values().put(idNode.id(), value);
+                }
                 default -> throw new UnsupportedOperationException("Unsupported type: " + expr.getClass());
             }
         });
 
+    }
+
+    private Object readValue(InputRequestValue inputRequest, Object o, boolean aleatorioEnabled) {
+        InputValue inputValue = aleatorioEnabled ? null : io.input().apply(inputRequest).join();
+        Object value = switch (o) {
+            case Boolean _ when aleatorioEnabled -> random.nextBoolean();
+            case String _ when aleatorioEnabled -> random.ints(65, 91)
+                    .limit(5)
+                    .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
+            case Double _ when aleatorio instanceof AleatorioState.Range range -> generateRandomDouble(range);
+            case Integer _ when aleatorio instanceof AleatorioState.Range(var start, var end, _) -> random.nextInt(start, end);
+
+            case Integer _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
+            case Double _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
+            case String _ when inputValue instanceof InputValue.CaracterValue(var value1) -> value1;
+            case Boolean _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
+
+            default -> throw new TypeException.MissingInput(inputRequest);
+        };
+        if (eco)
+            io.output().accept(value + "\n");
+        return value;
     }
 
     private static Node.IdNode getIdentifierForArray(Node arrayAccessNode) {
@@ -541,9 +599,23 @@ public class Interpreter {
             case Node.NotNode notNode -> evaluateNotNode(notNode);
             case Node.EmptyExpressionNode _ -> 0;
             case Node.ArrayAccessNode arrayAccessNode -> evaluateArrayAccessNode(arrayAccessNode);
-            case Node.MemberAccessNode _ -> throw new UnsupportedOperationException("MemberAccessNode not implemented");
+            case Node.MemberAccessNode memberAccessNode -> evaluateMemberAccessNode(memberAccessNode);
             case Node.RangeNode _ -> throw new UnsupportedOperationException("RangeNode not implemented");
         };
+    }
+
+    private Object evaluateMemberAccessNode(Node.MemberAccessNode memberAccessNode) {
+        Object evaluate = evaluate(memberAccessNode.node());
+        if (!(evaluate instanceof UserDefinedValue userDefinedValue)) {
+            throw new UnsupportedOperationException("Unsupported type: " + evaluate.getClass());
+        }
+        Node.IdNode member = (Node.IdNode) memberAccessNode.member();
+        UserDefinedType userDefinedType = userDefinedValue.type();
+        Node.TypeNode typeNode = userDefinedType.fields().get(member.id());
+        if (typeNode == null) {
+            throw new TypeException.VariableNotFound(member.id());
+        }
+        return userDefinedValue.values().get(member.id());
     }
 
     private Object evaluateNotNode(Node.NotNode notNode) {
@@ -910,12 +982,17 @@ public class Interpreter {
 
     private Class<?> getType(Node typeNode) {
         return switch (typeNode) {
-            case Node.TypeNode(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
+            case Node.TypeNodeImpl(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
                 case "inteiro" -> Integer.class;
                 case "real", "numerico" -> Double.class;
                 case "caracter", "caractere", "literal" -> String.class;
                 case "logico" -> Boolean.class;
-                default -> throw new UnsupportedOperationException("Unexpected value: " + type);
+                case String s -> {
+                    if (!userDefinedTypeMap.containsKey(s)) {
+                        throw new TypeException.TypeNotFound(s);
+                    }
+                    yield UserDefinedValue.class;
+                }
             };
             default -> throw new UnsupportedOperationException("Unexpected value: " + typeNode);
         };
@@ -923,12 +1000,22 @@ public class Interpreter {
 
     private Object newInstance(Node typeNode) {
         return switch (typeNode) {
-            case Node.TypeNode(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
+            case Node.TypeNodeImpl(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
                 case "inteiro" -> 0;
                 case "real", "numerico" -> 0.0;
                 case "caracter", "caractere", "literal" -> "";
                 case "logico" -> false;
-                default -> throw new UnsupportedOperationException("Unexpected value: " + type);
+                case String s -> {
+                    if (!userDefinedTypeMap.containsKey(s)) {
+                        throw new TypeException.TypeNotFound(s);
+                    }
+                    UserDefinedType userDefinedType = userDefinedTypeMap.get(s);
+                    Map<String, Node.TypeNode> fields = userDefinedType.fields();
+                    Map<String, Object> collect = fields.entrySet().stream()
+                            .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), newInstance(e.getValue())))
+                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                    yield new UserDefinedValue(userDefinedType, collect);
+                }
             };
             case Node.ArrayTypeNode(Node.TypeNode type, Node.CompundNode<Node> sizes, _) -> {
                 Class<?> typeClass = getType(type);
@@ -942,12 +1029,14 @@ public class Interpreter {
                     case Integer[] intArray -> Arrays.fill(intArray, newInstance(type));
                     case Double[] doubleArray -> Arrays.fill(doubleArray, newInstance(type));
                     case Boolean[] booleanArray -> Arrays.fill(booleanArray, newInstance(type));
+                    case UserDefinedValue[] userDefinedArray -> Arrays.setAll(userDefinedArray, _ -> newInstance(type));
 
                     case String[][] stringArray ->
                             Arrays.stream(stringArray).forEach(x -> Arrays.fill(x, newInstance(type)));
                     case Integer[][] intArray -> Arrays.stream(intArray).forEach(x -> Arrays.fill(x, newInstance(type)));
                     case Double[][] doubleArray -> Arrays.stream(doubleArray).forEach(x -> Arrays.fill(x, newInstance(type)));
                     case Boolean[][] booleanArray -> Arrays.stream(booleanArray).forEach(x -> Arrays.fill(x, newInstance(type)));
+                    case UserDefinedValue[][] userDefinedArray -> Arrays.stream(userDefinedArray).forEach(x -> Arrays.setAll(x, _ -> newInstance(type)));
                     default -> throw new UnsupportedOperationException("Unexpected value: " + o);
                 }
                 yield o;
@@ -955,5 +1044,4 @@ public class Interpreter {
             default -> throw new UnsupportedOperationException("Unexpected value: " + typeNode);
         };
     }
-
 }

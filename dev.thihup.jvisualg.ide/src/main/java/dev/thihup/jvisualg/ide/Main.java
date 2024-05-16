@@ -107,7 +107,7 @@ public class Main extends Application {
                                 switch (variableValue) {
                                     case Object[][] multiObjects -> addMultiArrayDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, multiObjects);
                                     case Object[] objects -> addArrayDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, objects);
-                                    case Object _ -> consumer.accept(new DebugState(scopeName.toUpperCase(), variableName.toUpperCase(), variableValue.getClass().getSimpleName(), variableValue.toString()));
+                                    case Object _ -> addObjectDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, variableValue);
                                 }
                             });
                         })
@@ -162,10 +162,36 @@ public class Main extends Application {
             Platform.runLater(stage::close);
     }
 
+    private static void addObjectDebug(String scope, String variableName, Consumer<DebugState> consumer, Object variableValue) {
+        String visualgType = getVisualgType(variableValue);
+        switch (variableValue) {
+            case Boolean b -> consumer.accept(new DebugState(scope, variableName, visualgType, b ? "VERDADEIRO" : "FALSO"));
+            case String s -> consumer.accept(new DebugState(scope, variableName, visualgType, "\"" + s + "\""));
+            case Integer _, Double _ -> {
+                consumer.accept(new DebugState(scope, variableName, visualgType, variableValue.toString()));
+            }
+            case UserDefinedValue userDefinedValue -> {
+                userDefinedValue.values().forEach((fieldName, fieldValue) -> addObjectDebug(scope, variableName + "." + fieldName, consumer, fieldValue));
+            }
+            default -> {
+            }
+        }
+    }
+
+    private static String getVisualgType(Object object) {
+        return switch (object) {
+            case Boolean _ -> "LOGICO";
+            case String _ -> "CARACTER";
+            case Double _ -> "REAL";
+            case Integer _ -> "INTEIRO";
+            default -> "Desconhecido";
+        };
+    }
+
     private static void addArrayDebug(String scope, String variableName, Consumer<DebugState> consumer, Object[] objects) {
         for (int i = 0; i < objects.length; i++) {
             Object object = objects[i];
-            consumer.accept(new DebugState(scope, variableName + "["+i+"]", object.getClass().getSimpleName(), object.toString()));
+            addObjectDebug(scope, variableName + "[" + i + "]", consumer, object);
         }
     }
 
@@ -174,7 +200,7 @@ public class Main extends Application {
             Object[] objects = multiObjects[i];
             for (int j = 0; j < objects.length; j++) {
                 Object object = objects[j];
-                consumer.accept(new DebugState(scope, variableName + "["+i+", "+j+"]", object.getClass().getSimpleName(), object.toString()));
+                addObjectDebug(scope, variableName + "["+i+", "+j+"]", consumer, object);
             }
         }
     }

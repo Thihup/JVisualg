@@ -38,7 +38,7 @@ public class JavaBackend {
                     "private static final boolean %s = %s;".formatted(name.id(), value);
 
 
-            case Node.TypeNode(Node.StringLiteralNode(String type, _), _) -> switch (type.toLowerCase()) {
+            case Node.TypeNodeImpl(Node.StringLiteralNode(String type, _), _) -> switch (type.toLowerCase()) {
                 case "inteiro" -> "int";
                 case "real" -> "double";
                 case "caracter", "caractere", "literal" -> "String";

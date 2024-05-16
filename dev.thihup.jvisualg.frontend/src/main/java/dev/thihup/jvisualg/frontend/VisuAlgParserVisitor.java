@@ -66,7 +66,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public CompundNode<VariableDeclarationNode> visitFormalParameter(VisuAlgParser.FormalParameterContext ctx) {
-        return new CompundNode<>(ctx.ID().stream().map(x -> new VariableDeclarationNode(visitId(x), visit(ctx.type()), ctx.VAR() != null, fromRuleContext(ctx))).toList(), fromRuleContext(ctx));
+        return new CompundNode<>(ctx.ID().stream().map(x -> new VariableDeclarationNode(visitId(x), visitType(ctx.type()), ctx.VAR() != null, fromRuleContext(ctx))).toList(), fromRuleContext(ctx));
     }
 
     @Override
@@ -120,15 +120,17 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitRegistroDeclaration(VisuAlgParser.RegistroDeclarationContext ctx) {
-        CompundNode<Node> variableDeclarationContexts = ctx.variableDeclaration().stream().map(this::visit).collect(toCompundNode(fromRuleContext(ctx)));
+        CompundNode<VariableDeclarationNode> variableDeclarationContexts = ctx.variableDeclaration().stream()
+                .flatMap((VisuAlgParser.VariableDeclarationContext ctx1) -> visitVariableDeclaration(ctx1).nodes().stream())
+                .collect(toCompundNode(fromRuleContext(ctx)));
         return new RegistroDeclarationNode(visitId(ctx.ID()), variableDeclarationContexts, fromRuleContext(ctx));
     }
 
 
     @Override
-    public Node visitVariableDeclaration(VisuAlgParser.VariableDeclarationContext ctx) {
+    public CompundNode<VariableDeclarationNode> visitVariableDeclaration(VisuAlgParser.VariableDeclarationContext ctx) {
         return ctx.ID().stream()
-                .map(x -> new VariableDeclarationNode(visitId(x), visit(ctx.type()), false, fromRuleContext(ctx)))
+                .map(x -> new VariableDeclarationNode(visitId(x), visitType(ctx.type()), false, fromRuleContext(ctx)))
                 .collect(toCompundNode(fromRuleContext(ctx)));
     }
 
@@ -170,16 +172,16 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
 
     @Override
-    public Node visitType(VisuAlgParser.TypeContext ctx) {
+    public TypeNode visitType(VisuAlgParser.TypeContext ctx) {
         TerminalNode vetor = ctx.VETOR();
         if (vetor == null)
-            return new TypeNode(new StringLiteralNode(ctx.getText(), fromRuleContext(ctx)), fromRuleContext(ctx));
+            return new TypeNodeImpl(new StringLiteralNode(ctx.getText(), fromRuleContext(ctx)), fromRuleContext(ctx));
         List<TerminalNode> range = ctx.RANGE();
 
         CompundNode<Node> list = range.stream()
                 .map(this::rangeToNode)
                 .collect(toCompundNode(fromRuleContext(ctx)));
-        return new ArrayTypeNode((TypeNode) visit(ctx.type()), list, fromRuleContext(ctx));
+        return new ArrayTypeNode(visitType(ctx.type()), list, fromRuleContext(ctx));
     }
 
     private Node rangeToNode(TerminalNode ctx) {
@@ -262,7 +264,7 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitMemberAccess(VisuAlgParser.MemberAccessContext ctx) {
-        return new MemberAccessNode(EmptyNode.INSTANCE, visit(ctx.idOrArray()), fromRuleContext(ctx));
+        return new MemberAccessNode(EmptyExpressionNode.INSTANCE, visit(ctx.idOrArray()), fromRuleContext(ctx));
     }
 
     @Override

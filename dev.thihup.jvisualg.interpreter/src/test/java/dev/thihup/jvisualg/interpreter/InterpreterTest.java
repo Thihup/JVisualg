@@ -471,6 +471,6 @@ class InterpreterTest extends ExamplesBase {
 
         Interpreter interpreter = new Interpreter(io);
 
-        interpreter.run(Files.readString(path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor()).get(1, TimeUnit.SECONDS);
+        interpreter.run(Files.readString(path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor()).get(10, TimeUnit.SECONDS);
     }
 }

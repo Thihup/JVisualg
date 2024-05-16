@@ -92,4 +92,10 @@ public sealed class TypeException extends RuntimeException {
             return clazz.getSimpleName();
         }
     }
+
+    public static final class TypeNotFound extends TypeException {
+        public TypeNotFound(String typeName) {
+            super("Type " + typeName + " not found.");
+        }
+    }
 }

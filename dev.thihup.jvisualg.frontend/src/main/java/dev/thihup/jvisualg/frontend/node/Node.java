@@ -51,13 +51,13 @@ public sealed interface Node {
             }
             case RegistroDeclarationNode(var name, CompundNode(var nodes, _), _) -> {
                 Stream<Node> nodeStream = Stream.of(name);
-                Stream<Node> nodesStream = nodes.stream();
+                Stream<VariableDeclarationNode> nodesStream = nodes.stream();
                 yield Stream.concat(nodeStream, nodesStream);
             }
             case VariableDeclarationNode(var name, var type, _, _) -> Stream.of(name, type);
             case CompundNode(var nodes, _) -> nodes.stream();
             case ConstantNode(var name, var value, _) -> Stream.of(name, value);
-            case BooleanLiteralNode _, IntLiteralNode _, RealLiteralNode _, StringLiteralNode _, TypeNode _ ->
+            case BooleanLiteralNode _, IntLiteralNode _, RealLiteralNode _, StringLiteralNode _ ->
                     Stream.of();
 
             case BinaryNode binaryNode -> Stream.of(binaryNode.left(), binaryNode.right());
@@ -116,14 +116,15 @@ public sealed interface Node {
             }
             case DebugCommandNode debugCommandNode -> Stream.of(debugCommandNode.expr());
             case AleatorioRangeNode aleatorioRangeNode -> Stream.of(aleatorioRangeNode.start(), aleatorioRangeNode.end(), aleatorioRangeNode.decimalPlaces());
-            case ArquivoCommandNode _, TimerCommandNode _, PausaCommandNode _, EcoCommandNode _,
+            case ArquivoCommandNode arquivoCommandNode -> Stream.of(arquivoCommandNode.name());
+            case TimerCommandNode _, PausaCommandNode _, EcoCommandNode _,
                  CronometroCommandNode _, LimpatelaCommandNode _ -> Stream.of();
+            case TypeNodeImpl(var type, _) -> Stream.of(type);
             case ArrayTypeNode(var type, CompundNode(var nodes, _), _) -> {
                 Stream<Node> typeStream = Stream.of(type);
                 Stream<Node> sizes = nodes.stream();
                 yield Stream.concat(typeStream, sizes);
             }
-
             case AssignmentNode assignmentNode ->
                     Stream.of(assignmentNode.idOrArray(), assignmentNode.expr());
             case DosNode _, IdNode _ -> Stream.of();
@@ -175,7 +176,7 @@ public sealed interface Node {
         }
     }
 
-    record RegistroDeclarationNode(IdNode name, CompundNode<Node> variableDeclarationContexts, Optional<Location> location) implements Node {
+    record RegistroDeclarationNode(IdNode name, CompundNode<VariableDeclarationNode> variableDeclarationContexts, Optional<Location> location) implements Node {
         public RegistroDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(variableDeclarationContexts);
@@ -183,7 +184,7 @@ public sealed interface Node {
         }
     }
 
-    record VariableDeclarationNode(IdNode name, Node type, boolean reference, Optional<Location> location) implements Node {
+    record VariableDeclarationNode(IdNode name, TypeNode type, boolean reference, Optional<Location> location) implements Node {
         public VariableDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(type);
@@ -242,9 +243,20 @@ public sealed interface Node {
             Objects.requireNonNull(location);
         }
     }
-    record TypeNode(Node type, Optional<Location> location) implements Node {
-        public TypeNode {
+
+    sealed interface TypeNode extends Node {}
+
+    record TypeNodeImpl(StringLiteralNode type, Optional<Location> location) implements TypeNode {
+        public TypeNodeImpl {
             Objects.requireNonNull(type);
+            Objects.requireNonNull(location);
+        }
+    }
+
+    record ArrayTypeNode(TypeNode type, CompundNode<Node> sizes, Optional<Location> location) implements TypeNode {
+        public ArrayTypeNode {
+            Objects.requireNonNull(type);
+            Objects.requireNonNull(sizes);
             Objects.requireNonNull(location);
         }
     }
@@ -297,7 +309,7 @@ public sealed interface Node {
         }
     }
 
-    record MemberAccessNode(Node node, Node member, Optional<Location> location) implements ExpressionNode {
+    record MemberAccessNode(ExpressionNode node, Node member, Optional<Location> location) implements ExpressionNode {
         public MemberAccessNode {
             Objects.requireNonNull(node);
             Objects.requireNonNull(member);
@@ -611,14 +623,6 @@ public sealed interface Node {
 
     record LimpatelaCommandNode(Optional<Location> location) implements CommandNode {
         public LimpatelaCommandNode {
-            Objects.requireNonNull(location);
-        }
-    }
-
-    record ArrayTypeNode(TypeNode type, CompundNode<Node> sizes, Optional<Location> location) implements Node {
-        public ArrayTypeNode {
-            Objects.requireNonNull(type);
-            Objects.requireNonNull(sizes);
             Objects.requireNonNull(location);
         }
     }

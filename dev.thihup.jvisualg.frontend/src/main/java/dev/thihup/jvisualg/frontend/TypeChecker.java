@@ -665,7 +665,8 @@ public class TypeChecker {
     private static Type getType(Node node, Scope scope, List<Error> errors) {
         return switch (node) {
             case Node.EmptyNode _ -> Type.PrimitiveTypes.UNDEFINED;
-            case Node.TypeNode(Node.StringLiteralNode(String stringValue, _), var location) -> switch (stringValue.toLowerCase()) {
+            case Node.EmptyExpressionNode _ -> UNDECLARED;
+            case Node.TypeNodeImpl(Node.StringLiteralNode(String stringValue, _), var location) -> switch (stringValue.toLowerCase()) {
                 case "inteiro" -> Type.PrimitiveTypes.INTEIRO;
                 case "real", "numerico" -> Type.PrimitiveTypes.REAL;
                 case "logico" -> Type.PrimitiveTypes.LOGICO;
