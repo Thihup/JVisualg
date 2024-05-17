@@ -425,7 +425,7 @@ public class TypeChecker {
             return;
         }
         if (functionCallNode.args().nodes().size() != function.get().parameters().size()) {
-            errors.add(new Error("Function " + functionCallNode.name().id() + "called with wrong number of arguments. Expected: " + function.get().parameters().size() + " but got: " + functionCallNode.args().nodes().size(), functionCallNode.location().orElse(Location.EMPTY)));
+            errors.add(new Error("Function " + functionCallNode.name().id() + " called with wrong number of arguments. Expected: " + function.get().parameters().size() + " but got: " + functionCallNode.args().nodes().size(), functionCallNode.location().orElse(Location.EMPTY)));
         }
     }
 
@@ -436,7 +436,7 @@ public class TypeChecker {
             return;
         }
         if (procedureCallNode.args().nodes().size() != procedure.get().parameters().size()) {
-            errors.add(new Error("Procedure " + procedureCallNode.name().id() + "called with wrong number of arguments. Expected: " + procedure.get().parameters().size() + " but got: " + procedureCallNode.args().nodes().size(), procedureCallNode.location().orElse(Location.EMPTY)));
+            errors.add(new Error("Procedure " + procedureCallNode.name().id() + " called with wrong number of arguments. Expected: " + procedure.get().parameters().size() + " but got: " + procedureCallNode.args().nodes().size(), procedureCallNode.location().orElse(Location.EMPTY)));
         }
     }
 
