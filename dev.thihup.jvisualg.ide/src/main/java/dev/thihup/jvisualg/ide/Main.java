@@ -63,7 +63,6 @@ public class Main extends Application {
     private TableView<DebugState> debugArea;
 
 
-
     private Consumer<String> callback;
 
     private TextArea dosContent;
@@ -83,10 +82,10 @@ public class Main extends Application {
         appendOutput("\n>>> Fim da execução do programa !", ToWhere.DOS, When.LATER);
     }
 
-    public record DebugState(String getEscopo, String getNome, String getTipo, String getValor){}
+    public record DebugState(String getEscopo, String getNome, String getTipo, String getValor) {
+    }
 
-    private int previousLine = -1;
-    private StyleSpans<Collection<String>> previousLineStyle;
+    private int previousDebugLine = -1;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -170,7 +169,7 @@ public class Main extends Application {
         debugArea.getItems().clear();
         appendOutput("Início da execução\n", ToWhere.OUTPUT, When.NOW);
         interpreter.reset();
-        previousLine = -1;
+        previousDebugLine = -1;
         breakpointLines.forEach(interpreter::addBreakpoint);
 
         dosContent.setStyle(DEFAULT_CONSOLE_STYLE);
@@ -186,7 +185,8 @@ public class Main extends Application {
                         final String scopeName = entry.getKey().toUpperCase();
                         final String variableNameUpperCase = variableName.toUpperCase();
                         switch (variableValue) {
-                            case Object[][] multiObjects -> addMultiArrayDebug(scopeName, variableNameUpperCase, consumer, multiObjects);
+                            case Object[][] multiObjects ->
+                                    addMultiArrayDebug(scopeName, variableNameUpperCase, consumer, multiObjects);
                             case Object[] objects -> addArrayDebug(scopeName, variableNameUpperCase, consumer, objects);
                             case Object _ -> addObjectDebug(scopeName, variableNameUpperCase, consumer, variableValue);
                         }
@@ -199,33 +199,28 @@ public class Main extends Application {
         if (lineNumber < 0) {
             return;
         }
-        if (previousLine != -1) {
+        if (previousDebugLine != -1) {
             removeDebugStyleFromPreviousLine();
         }
         codeArea.showParagraphAtCenter(lineNumber);
         codeArea.getCaretSelectionBind().moveTo(lineNumber, 0);
 
-        previousLineStyle = codeArea.getStyleSpans(lineNumber);
-        StyleSpans<Collection<String>> debug = previousLineStyle.mapStyles(x -> {
-            ArrayList<String> strings = new ArrayList<>(x);
-            strings.add("debug");
-            return strings;
-        });
-
-        codeArea.setStyleSpans(lineNumber, 0, debug);
-        previousLine = lineNumber;
+        codeArea.setParagraphStyle(lineNumber, List.of("debug"));
+        previousDebugLine = lineNumber;
     }
 
     private void removeDebugStyleFromPreviousLine() {
-        codeArea.setStyleSpans(previousLine, 0, previousLineStyle);
+        codeArea.setParagraphStyle(previousDebugLine, List.of());
     }
 
     private static void addObjectDebug(String scope, String variableName, Consumer<DebugState> consumer, Object variableValue) {
         String visualgType = getVisualgType(variableValue);
         switch (variableValue) {
-            case Boolean b -> consumer.accept(new DebugState(scope, variableName, visualgType, b ? "VERDADEIRO" : "FALSO"));
+            case Boolean b ->
+                    consumer.accept(new DebugState(scope, variableName, visualgType, b ? "VERDADEIRO" : "FALSO"));
             case String s -> consumer.accept(new DebugState(scope, variableName, visualgType, "\"" + s + "\""));
-            case Integer _, Double _ -> consumer.accept(new DebugState(scope, variableName, visualgType, variableValue.toString()));
+            case Integer _, Double _ ->
+                    consumer.accept(new DebugState(scope, variableName, visualgType, variableValue.toString()));
             case UserDefinedValue userDefinedValue -> {
                 userDefinedValue.values().forEach((fieldName, fieldValue) -> addObjectDebug(scope, variableName + "." + fieldName, consumer, fieldValue));
             }
@@ -256,10 +251,11 @@ public class Main extends Application {
             Object[] objects = multiObjects[i];
             for (int j = 0; j < objects.length; j++) {
                 Object object = objects[j];
-                addObjectDebug(scope, variableName + "["+i+", "+j+"]", consumer, object);
+                addObjectDebug(scope, variableName + "[" + i + ", " + j + "]", consumer, object);
             }
         }
     }
+
     enum ToWhere {
         DOS, OUTPUT, BOTH
     }
@@ -267,6 +263,7 @@ public class Main extends Application {
     enum When {
         NOW, LATER
     }
+
 
     private void appendOutput(String output, ToWhere where, When when) {
         Runnable runnable = () -> {
@@ -279,6 +276,7 @@ public class Main extends Application {
                 }
             }
         };
+
         switch (when) {
             case NOW -> runnable.run();
             case LATER -> Platform.runLater(runnable);
@@ -290,12 +288,14 @@ public class Main extends Application {
             switch (outputEvent) {
                 case OutputEvent.Text text -> appendOutput(text.text(), ToWhere.BOTH, When.NOW);
                 case OutputEvent.Clear _ -> dosContent.clear();
-                case OutputEvent.ChangeColor changeColor -> {
-                    switch (changeColor.position()) {
+                case OutputEvent.ChangeColor(
+                        OutputEvent.ChangeColor.Color color, OutputEvent.ChangeColor.Position position
+                ) -> {
+                    switch (position) {
                         case FOREGROUND ->
-                                dosContent.setStyle(dosContent.getStyle() + ";-fx-text-fill:" + changeColor.color().toString().toLowerCase() + ";");
+                                dosContent.setStyle(dosContent.getStyle() + ";-fx-text-fill:" + color.toString().toLowerCase() + ";");
                         case BACKGROUND ->
-                                dosContent.setStyle(dosContent.getStyle() + ";-fx-control-inner-background:" + changeColor.color().toString().toLowerCase() + ";");
+                                dosContent.setStyle(dosContent.getStyle() + ";-fx-control-inner-background:" + color.toString().toLowerCase() + ";");
                     }
                 }
                 case null, default -> {
@@ -345,7 +345,8 @@ public class Main extends Application {
                     interpreter.stop();
                 }
             }
-            default -> {}
+            default -> {
+            }
         }
     }
 
@@ -367,15 +368,15 @@ public class Main extends Application {
                 callback = strip -> {
                     strip = strip.strip();
                     getValue(request, strip)
-                    .ifPresentOrElse(inputValueCompletableFuture::complete,
-                            () -> inputValueCompletableFuture.complete(null));
+                            .ifPresentOrElse(inputValueCompletableFuture::complete,
+                                    () -> inputValueCompletableFuture.complete(null));
                 };
                 return;
             }
             TextInputDialog textInputDialog = new TextInputDialog();
             textInputDialog.setContentText("Digite um valor " + request.type() + "  para a variável " + request.variableName());
             textInputDialog.showAndWait()
-                    .flatMap(textValue -> getValue(request,textValue))
+                    .flatMap(textValue -> getValue(request, textValue))
                     .ifPresentOrElse(inputValueCompletableFuture::complete,
                             () -> inputValueCompletableFuture.complete(null));
         });
@@ -415,17 +416,19 @@ public class Main extends Application {
                             breakpointLines.addLast(1);
                             runButton.fire();
                         }
-                        case RUNNING  -> {
+                        case RUNNING -> {
                         }
                     }
                 }
                 case ESCAPE -> {
                     switch (interpreter.state()) {
                         case STOPPED -> dosWindow.hide();
-                        default -> {}
+                        default -> {
+                        }
                     }
                 }
-                default -> {}
+                default -> {
+                }
             }
         });
         scene.getStylesheets().add(getClass().getResource("styles.css").toExternalForm());

@@ -98,8 +98,8 @@ public class Interpreter {
             throw new CancellationException("Program was cancelled");
         }
         try {
-            if (state != State.PAUSED && breakpoints.stream().anyMatch(x -> x == node.location().orElse(Location.EMPTY).startLine()) &&
-                (node instanceof Node.CommandNode || node instanceof Node.ExpressionNode || node instanceof Node.DeclarationNode)) {
+            if (state != State.PAUSED && breakpoints.contains(node.location().orElse(Location.EMPTY).startLine()) &&
+                !(node instanceof Node.CompundNode<?>)) {
                 state = State.PAUSED;
             }
 
