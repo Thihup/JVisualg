@@ -12,6 +12,9 @@ import javafx.geometry.Point2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import org.eclipse.lsp4j.*;
@@ -23,7 +26,6 @@ import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
 import org.fxmisc.richtext.event.MouseOverTextEvent;
 import org.fxmisc.richtext.model.StyleSpans;
-import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.reactfx.Subscription;
 
 import java.io.IOException;
@@ -33,17 +35,18 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class Main extends Application {
 
+    public static final String DEFAULT_CONSOLE_STYLE = """
+                    -fx-control-inner-background: black;
+                    -fx-text-fill: white;
+                    -fx-font-family: "Consolas";
+                    -fx-font-size: 12;
+            """;
     private final ExecutorService fxClientExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -59,6 +62,13 @@ public class Main extends Application {
     @FXML
     private TableView<DebugState> debugArea;
 
+
+
+    private Consumer<String> callback;
+
+    private TextArea dosContent;
+    private Stage dosWindow;
+
     private Subscription subscribe;
     private Launcher<LanguageServer> clientLauncher;
     private Future<Void> lspServer;
@@ -66,10 +76,17 @@ public class Main extends Application {
     private List<Diagnostic> diagnostics;
     private Interpreter interpreter;
     private List<Integer> breakpointLines = new ArrayList<>();
+    private int lastPromptPosition = 0;
+
+    private void handleExecutionSuccessfully() {
+        appendOutput("\nFim da execução.", ToWhere.OUTPUT, When.LATER);
+        appendOutput("\n>>> Fim da execução do programa !", ToWhere.DOS, When.LATER);
+    }
 
     public record DebugState(String getEscopo, String getNome, String getTipo, String getValor){}
 
     private int previousLine = -1;
+    private StyleSpans<Collection<String>> previousLineStyle;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -87,71 +104,38 @@ public class Main extends Application {
 
         setupLSP();
 
+        dosWindow = new Stage();
+        dosContent = new TextArea();
 
-        interpreter = new Interpreter(new IO(this::readVariable, this::appendOutput), programState -> {
+        dosContent.setStyle(DEFAULT_CONSOLE_STYLE);
+        dosWindow.setTitle("Emulação do DOS");
+        dosWindow.setScene(new Scene(dosContent));
+        dosContent.setEditable(false);
+        dosContent.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKeyPress);
+        dosContent.addEventFilter(MouseEvent.MOUSE_CLICKED, this::handleMouseClick);
+
+        interpreter = new Interpreter(new IO(this::readVariable, this::handleOutputEvent), programState -> {
             Platform.runLater(() -> {
-                int lineNumber = programState.lineNumber();
-                codeArea.showParagraphAtCenter(lineNumber);
-                codeArea.getCaretSelectionBind().moveTo(lineNumber, 0);
-                if (previousLine != -1) {
-                    codeArea.setStyle(previousLine, List.of());
-                }
-                previousLine = lineNumber;
-                codeArea.setStyle(lineNumber, List.of("debug"));
-
-                debugArea.getItems().clear();
-                programState.stack().entrySet().stream()
-                        .mapMulti((Map.Entry<String, Map<String, Object>> value, Consumer<DebugState> consumer) -> {
-                            value.getValue().forEach((variableName, variableValue) -> {
-                                final String scopeName = value.getKey();
-                                switch (variableValue) {
-                                    case Object[][] multiObjects -> addMultiArrayDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, multiObjects);
-                                    case Object[] objects -> addArrayDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, objects);
-                                    case Object _ -> addObjectDebug(scopeName.toUpperCase(), variableName.toUpperCase(), consumer, variableValue);
-                                }
-                            });
-                        })
-                        .forEach(x -> debugArea.getItems().add(x));
-
+                updateDebugArea(programState);
+                highlightCurrentLine(programState.lineNumber());
             });
         });
 
         runButton.addEventHandler(ActionEvent.ACTION, _ -> {
             Platform.runLater(() -> {
-                if (interpreter.state() == Interpreter.State.PAUSED) {
-                    if (previousLine != -1) {
-                        codeArea.setStyle(previousLine, List.of());
+                switch (interpreter.state()) {
+                    case RUNNING -> {
                     }
-                    interpreter.continueExecution();
-                    return;
+                    case PAUSED -> interpreter.continueExecution();
+                    case STOPPED -> {
+                        resetExecution();
+
+                        interpreter.run(codeArea.getText(), executor)
+                                .thenRun(this::handleExecutionSuccessfully)
+                                .exceptionally(this::handleExecutionError)
+                                .whenComplete((_, _) -> Platform.runLater(this::removeDebugStyleFromPreviousLine));
+                    }
                 }
-                outputArea.clear();
-                debugArea.getItems().clear();
-                outputArea.appendText("Início da execução\n");
-                interpreter.reset();
-                previousLine = 0;
-                breakpointLines.forEach(interpreter::addBreakpoint);
-
-                interpreter.run(codeArea.getText(), executor)
-                    .thenRun(() -> appendOutput("\nFim da execução."))
-                    .exceptionally(e -> {
-                        if (e.getCause() instanceof TypeException) {
-                            appendOutput(e.getCause().getMessage());
-                        } else if (e.getCause() != null) {
-                            e.printStackTrace();
-                            appendOutput(e.getCause().toString());
-                        }
-                        appendOutput("\nExecução terminada por erro.");
-                        return null;
-                    }).whenComplete((_, _) -> {
-                        Platform.runLater(() -> {
-                            if (previousLine != -1) {
-                                codeArea.setStyle(previousLine, List.of());
-                            }
-                            previousLine = -1;
-                        });
-                    });
-
             });
         });
 
@@ -162,14 +146,86 @@ public class Main extends Application {
             Platform.runLater(stage::close);
     }
 
+    private Void handleExecutionError(Throwable e) {
+        if (e.getCause() instanceof CancellationException) {
+            appendOutput("\n*** Execução terminada pelo usuário.", ToWhere.DOS, When.LATER);
+            appendOutput("\n*** Feche esta janela para retornar ao Visual.", ToWhere.DOS, When.LATER);
+
+            appendOutput("\nExecução terminada pelo usuário.", ToWhere.OUTPUT, When.LATER);
+            return null;
+        } else if (e.getCause() instanceof TypeException) {
+            appendOutput(e.getCause().getMessage(), ToWhere.OUTPUT, When.LATER);
+        } else if (e.getCause() != null) {
+            e.printStackTrace();
+            appendOutput(e.getCause().toString(), ToWhere.OUTPUT, When.LATER);
+        }
+
+        appendOutput("\nExecução terminada por erro.", ToWhere.BOTH, When.LATER);
+        appendOutput("\n>>> Fim da execução do programa !", ToWhere.DOS, When.LATER);
+        return null;
+    }
+
+    private void resetExecution() {
+        outputArea.clear();
+        debugArea.getItems().clear();
+        appendOutput("Início da execução\n", ToWhere.OUTPUT, When.NOW);
+        interpreter.reset();
+        previousLine = -1;
+        breakpointLines.forEach(interpreter::addBreakpoint);
+
+        dosContent.setStyle(DEFAULT_CONSOLE_STYLE);
+        dosContent.clear();
+        dosWindow.show();
+    }
+
+    private void updateDebugArea(Interpreter.ProgramState programState) {
+        debugArea.getItems().clear();
+        programState.stack().entrySet().stream()
+                .mapMulti((Map.Entry<String, Map<String, Object>> entry, Consumer<DebugState> consumer) -> {
+                    entry.getValue().forEach((variableName, variableValue) -> {
+                        final String scopeName = entry.getKey().toUpperCase();
+                        final String variableNameUpperCase = variableName.toUpperCase();
+                        switch (variableValue) {
+                            case Object[][] multiObjects -> addMultiArrayDebug(scopeName, variableNameUpperCase, consumer, multiObjects);
+                            case Object[] objects -> addArrayDebug(scopeName, variableNameUpperCase, consumer, objects);
+                            case Object _ -> addObjectDebug(scopeName, variableNameUpperCase, consumer, variableValue);
+                        }
+                    });
+                })
+                .forEach(debugArea.getItems()::add);
+    }
+
+    private void highlightCurrentLine(int lineNumber) {
+        if (lineNumber < 0) {
+            return;
+        }
+        if (previousLine != -1) {
+            removeDebugStyleFromPreviousLine();
+        }
+        codeArea.showParagraphAtCenter(lineNumber);
+        codeArea.getCaretSelectionBind().moveTo(lineNumber, 0);
+
+        previousLineStyle = codeArea.getStyleSpans(lineNumber);
+        StyleSpans<Collection<String>> debug = previousLineStyle.mapStyles(x -> {
+            ArrayList<String> strings = new ArrayList<>(x);
+            strings.add("debug");
+            return strings;
+        });
+
+        codeArea.setStyleSpans(lineNumber, 0, debug);
+        previousLine = lineNumber;
+    }
+
+    private void removeDebugStyleFromPreviousLine() {
+        codeArea.setStyleSpans(previousLine, 0, previousLineStyle);
+    }
+
     private static void addObjectDebug(String scope, String variableName, Consumer<DebugState> consumer, Object variableValue) {
         String visualgType = getVisualgType(variableValue);
         switch (variableValue) {
             case Boolean b -> consumer.accept(new DebugState(scope, variableName, visualgType, b ? "VERDADEIRO" : "FALSO"));
             case String s -> consumer.accept(new DebugState(scope, variableName, visualgType, "\"" + s + "\""));
-            case Integer _, Double _ -> {
-                consumer.accept(new DebugState(scope, variableName, visualgType, variableValue.toString()));
-            }
+            case Integer _, Double _ -> consumer.accept(new DebugState(scope, variableName, visualgType, variableValue.toString()));
             case UserDefinedValue userDefinedValue -> {
                 userDefinedValue.values().forEach((fieldName, fieldValue) -> addObjectDebug(scope, variableName + "." + fieldName, consumer, fieldValue));
             }
@@ -204,40 +260,151 @@ public class Main extends Application {
             }
         }
     }
+    enum ToWhere {
+        DOS, OUTPUT, BOTH
+    }
 
-    private void appendOutput(String output) {
-        Platform.runLater(() -> outputArea.appendText(output));
+    enum When {
+        NOW, LATER
+    }
+
+    private void appendOutput(String output, ToWhere where, When when) {
+        Runnable runnable = () -> {
+            switch (where) {
+                case DOS -> dosContent.appendText(output);
+                case OUTPUT -> outputArea.appendText(output);
+                case BOTH -> {
+                    dosContent.appendText(output);
+                    outputArea.appendText(output);
+                }
+            }
+        };
+        switch (when) {
+            case NOW -> runnable.run();
+            case LATER -> Platform.runLater(runnable);
+        }
+    }
+
+    private void handleOutputEvent(OutputEvent outputEvent) {
+        Platform.runLater(() -> {
+            switch (outputEvent) {
+                case OutputEvent.Text text -> appendOutput(text.text(), ToWhere.BOTH, When.NOW);
+                case OutputEvent.Clear _ -> dosContent.clear();
+                case OutputEvent.ChangeColor changeColor -> {
+                    switch (changeColor.position()) {
+                        case FOREGROUND ->
+                                dosContent.setStyle(dosContent.getStyle() + ";-fx-text-fill:" + changeColor.color().toString().toLowerCase() + ";");
+                        case BACKGROUND ->
+                                dosContent.setStyle(dosContent.getStyle() + ";-fx-control-inner-background:" + changeColor.color().toString().toLowerCase() + ";");
+                    }
+                }
+                case null, default -> {
+                }
+            }
+        });
+    }
+
+    private void handleKeyPress(KeyEvent event) {
+        TextArea textArea = (TextArea) event.getSource();
+        switch (event.getCode()) {
+            case ENTER -> {
+                int currentCaretPosition = textArea.getCaretPosition();
+                String fullText = textArea.getText();
+                if (lastPromptPosition < currentCaretPosition) {
+                    String newCommand = fullText.substring(lastPromptPosition, currentCaretPosition).trim();
+                    if (callback != null) callback.accept(newCommand);
+                }
+                textArea.positionCaret(lastPromptPosition);
+                event.consume();
+            }
+            case KeyCode.BACK_SPACE, KeyCode.DELETE, KeyCode.LEFT, KeyCode.HOME -> {
+                if (textArea.getCaretPosition() <= lastPromptPosition) {
+                    event.consume();
+                }
+            }
+            case RIGHT, KeyCode.END -> {
+                if (textArea.getCaretPosition() > lastPromptPosition) {
+                    textArea.positionCaret(lastPromptPosition);
+                    event.consume();
+                }
+            }
+            case KeyCode.UP, KeyCode.DOWN -> event.consume();
+
+            case KeyCode.A -> {
+                if (event.isControlDown()) {
+                    event.consume();
+                }
+            }
+            case KeyCode.ESCAPE -> {
+                event.consume();
+                dosContent.clear();
+                dosWindow.hide();
+            }
+            case KeyCode.F2 -> {
+                if (event.isControlDown() && interpreter != null) {
+                    interpreter.stop();
+                }
+            }
+            default -> {}
+        }
+    }
+
+    private void handleMouseClick(MouseEvent event) {
+        TextArea textArea = (TextArea) event.getSource();
+        if (textArea.getCaretPosition() < lastPromptPosition) {
+            textArea.positionCaret(textArea.getText().length());
+            event.consume();
+        }
     }
 
     private CompletableFuture<InputValue> readVariable(InputRequestValue request) {
         CompletableFuture<InputValue> inputValueCompletableFuture = new CompletableFuture<>();
 
         Platform.runLater(() -> {
+            if (dosWindow.isShowing()) {
+                dosContent.setEditable(true);
+                lastPromptPosition = dosContent.getText().length();
+                callback = strip -> {
+                    strip = strip.strip();
+                    getValue(request, strip)
+                    .ifPresentOrElse(inputValueCompletableFuture::complete,
+                            () -> inputValueCompletableFuture.complete(null));
+                };
+                return;
+            }
             TextInputDialog textInputDialog = new TextInputDialog();
             textInputDialog.setContentText("Digite um valor " + request.type() + "  para a variável " + request.variableName());
             textInputDialog.showAndWait()
-                    .flatMap(textValue -> {
-                        try {
-                            return Optional.<InputValue>of(switch (request.type()) {
-                                case CARACTER -> new InputValue.CaracterValue(textValue);
-                                case LOGICO -> new InputValue.LogicoValue(Boolean.parseBoolean(textValue));
-                                case REAL -> new InputValue.RealValue(Double.parseDouble(textValue));
-                                case INTEIRO -> new InputValue.InteiroValue(Integer.parseInt(textValue));
-                            });
-                        } catch (Exception e) {
-                            return Optional.empty();
-                        }
-                    }).ifPresentOrElse(inputValueCompletableFuture::complete,
+                    .flatMap(textValue -> getValue(request,textValue))
+                    .ifPresentOrElse(inputValueCompletableFuture::complete,
                             () -> inputValueCompletableFuture.complete(null));
         });
 
         return inputValueCompletableFuture;
     }
 
+    private static Optional<InputValue> getValue(InputRequestValue request, String textValue) {
+        try {
+            return Optional.of(switch (request.type()) {
+                case CARACTER -> new InputValue.CaracterValue(textValue);
+                case LOGICO -> new InputValue.LogicoValue(textValue.equalsIgnoreCase("VERDADEIRO"));
+                case REAL -> new InputValue.RealValue(Double.parseDouble(textValue));
+                case INTEIRO -> new InputValue.InteiroValue(Integer.parseInt(textValue));
+            });
+        } catch (Exception _) {
+            return Optional.empty();
+        }
+    }
+
     private void showScene(Stage stage, Parent root) {
         Scene scene = new Scene(root);
         scene.setOnKeyPressed(x -> {
             switch (x.getCode()) {
+                case F2 -> {
+                    if (x.isControlDown() && interpreter != null) {
+                        interpreter.stop();
+                    }
+                }
                 case F9 -> runButton.fire();
                 case F8 -> {
                     switch (interpreter.state()) {
@@ -250,6 +417,12 @@ public class Main extends Application {
                         }
                         case RUNNING  -> {
                         }
+                    }
+                }
+                case ESCAPE -> {
+                    switch (interpreter.state()) {
+                        case STOPPED -> dosWindow.hide();
+                        default -> {}
                     }
                 }
                 default -> {}
@@ -411,38 +584,6 @@ public class Main extends Application {
         launch(args);
     }
 
-    private static final List<String> KEYWORDS = List.of(
-            "Div", "Mod", "Se", "Entao", "Então", "Senao", "Senão", "FimSe", "Para", "De", "Ate", "Até", "Passo", "FimPara", "Faca", "Faça", "Enquanto", "FimEnquanto", "Retorne", "E", "Ou", "Nao", "Não", "Escolha", "FimEscolha", "Repita", "FimRepita", "Caso", "OutroCaso",
-            "abs", "arccos", "arcsen", "arctan", "asc", "carac", "caracpnum", "compr", "copia", "cos", "cotan", "exp", "grauprad", "int", "log", "logn", "maiusc", "minusc", "numpcarac", "pos", "pi", "quad", "radpgrau", "raizq", "rand", "randi", "sen", "tan"
-
-    );
-
-    private static final List<String> DATA_TYPES = List.of(
-            "Inteiro", "Real", "Logico", "Caracter", "Caractere", "Literal", "Vetor"
-    );
-
-    private static final List<String> SPECIAL_KEYWORDS = List.of(
-            "Escreva", "Escreval", "Leia", "Algoritmo", "FimAlgoritmo", "Funcao", "Função", "FimFuncao", "FimFunção", "Procedimento", "FimProcedimento", "Inicio", "Var"
-    );
-
-
-    private static final String STRING_PATTERN = "\"([^\"\\\\]|\\\\.)*\"";
-    private static final String KEYWORD_PATTERN = "(?i)\\b(" + String.join("|", KEYWORDS) + ")\\b";
-    private static final String SPECIAL_PATTERN = "(?i)\\b(" + String.join("|", SPECIAL_KEYWORDS) + ")\\b";
-    private static final String TYPES_PATTERN = "(?i)\\b(" + String.join("|", DATA_TYPES) + ")\\b";
-    private static final String BOOLEAN_PATTERN = "(?i)\\b(VERDADEIRO|FALSO)\\b";
-    private static final String COMMENT_PATTERN = "//[^\\n\\r]+?(?:\\*\\)|[\\n\\r])";
-    private static final String NUMBER_PATTERN = "(?<![a-zA-Z])\\d+";
-
-    private static final Pattern PATTERN = Pattern.compile(
-
-            "(?<KEYWORD>" + KEYWORD_PATTERN + ")"
-                    + "|(?<STRING>" + STRING_PATTERN + ")"
-                    + "|(?<COMMENT>" + COMMENT_PATTERN + ")"
-                    + "|(?<NUMBER>" + NUMBER_PATTERN + ")"
-                    + "|(?<BOOLEAN>" + BOOLEAN_PATTERN + ")"
-                    + "|(?<TYPE>" + TYPES_PATTERN + ")"
-                    + "|(?<SPECIAL>" + SPECIAL_PATTERN + ")");
 
     private final LongAdder counter = new LongAdder();
 
@@ -454,7 +595,7 @@ public class Main extends Application {
                 VersionedTextDocumentIdentifier versionedTextDocumentIdentifier = new VersionedTextDocumentIdentifier("untitled://file", counter.intValue());
                 DidChangeTextDocumentParams didChangeTextDocumentParams = new DidChangeTextDocumentParams(versionedTextDocumentIdentifier, Collections.singletonList(new TextDocumentContentChangeEvent(text)));
                 clientLauncher.getRemoteProxy().getTextDocumentService().didChange(didChangeTextDocumentParams);
-                return computeHighlighting(text);
+                return SyntaxHighlight.computeHighlighting(text);
             }
         };
         fxClientExecutor.execute(task);
@@ -465,29 +606,5 @@ public class Main extends Application {
         codeArea.setStyleSpans(0, highlighting);
     }
 
-    private StyleSpans<Collection<String>> computeHighlighting(String text) {
-        Matcher matcher = PATTERN.matcher(text);
-        int lastKwEnd = 0;
-        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
-        while (matcher.find()) {
-            List<String> style = switch (matcher) {
 
-                case Matcher _ when matcher.group("KEYWORD") != null -> List.of("keyword");
-                case Matcher _ when matcher.group("STRING") != null -> List.of("string");
-                case Matcher _ when matcher.group("COMMENT") != null -> List.of("comment", "italic");
-                case Matcher _ when matcher.group("NUMBER") != null -> List.of("number");
-                case Matcher _ when matcher.group("TYPE") != null -> List.of("dataType", "underline");
-                case Matcher _ when matcher.group("SPECIAL") != null -> List.of("special", "underline");
-                case Matcher _ when matcher.group("BOOLEAN") != null -> List.of("number");
-                default -> throw new IllegalStateException("Unexpected value: " + matcher);
-
-            };
-
-            spansBuilder.add(List.of(), matcher.start() - lastKwEnd);
-            spansBuilder.add(style, matcher.end() - matcher.start());
-            lastKwEnd = matcher.end();
-        }
-        spansBuilder.add(List.of(), text.length() - lastKwEnd);
-        return spansBuilder.create();
-    }
 }

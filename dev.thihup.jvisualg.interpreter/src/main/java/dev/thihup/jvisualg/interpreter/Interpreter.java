@@ -13,10 +13,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.*;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
@@ -32,7 +29,7 @@ public class Interpreter {
     private final Consumer<ProgramState> debuggerCallback;
 
     private AleatorioState aleatorio = AleatorioState.Off.INSTANCE;
-    private boolean eco = true;
+    private boolean eco = false;
     private List<Integer> breakpoints = new ArrayList<>();
 
     public enum State {
@@ -40,7 +37,7 @@ public class Interpreter {
         PAUSED,
         STOPPED
     }
-    private State state = State.STOPPED;
+    private volatile State state = State.STOPPED;
 
     private sealed interface AleatorioState {
         record Range(int start, int end, int decimalPlaces) implements AleatorioState {}
@@ -80,25 +77,29 @@ public class Interpreter {
     }
 
     public CompletableFuture<Void> run(String code, ExecutorService executorService) {
-        state = State.RUNNING;
-        ASTResult parse = VisualgParser.parse(code);
-        CompletableFuture<Void> execution;
-        if (parse.node().isPresent())
-            execution = CompletableFuture.runAsync(() -> run(parse.node().get()), executorService);
-        else {
-            Exception ex = new Exception("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n")));
-            execution = CompletableFuture.failedFuture(ex);
-        }
-        return execution.whenComplete((_, _) -> {
-            if (debuggerCallback != null)
-                debuggerCallback.accept(new ProgramState(0, Map.copyOf(stack)));
+        return CompletableFuture.runAsync(() -> {
+            state = State.RUNNING;
+            ASTResult parse = VisualgParser.parse(code);
+                parse.node()
+                    .ifPresentOrElse(this::run, () -> {
+                        throw new RuntimeException("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n")));
+                    });
+
+        }, executorService).whenComplete((_, _) -> {
+            if (debuggerCallback != null) {
+                debuggerCallback.accept(new ProgramState(0, stack));
+            }
             state = State.STOPPED;
         });
     }
 
     private void run(Node node) {
+        if (state == State.STOPPED) {
+            throw new CancellationException("Program was cancelled");
+        }
         try {
-            if (state != State.PAUSED && breakpoints.stream().anyMatch(x -> x == node.location().orElse(Location.EMPTY).startLine()) && !(node instanceof Node.CompundNode<?>)) {
+            if (state != State.PAUSED && breakpoints.stream().anyMatch(x -> x == node.location().orElse(Location.EMPTY).startLine()) &&
+                (node instanceof Node.CommandNode || node instanceof Node.ExpressionNode || node instanceof Node.DeclarationNode)) {
                 state = State.PAUSED;
             }
 
@@ -108,20 +109,28 @@ public class Interpreter {
 
             switch (node) {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
-                case Node.ArrayTypeNode _ -> throw new UnsupportedOperationException("ArrayTypeNode not implemented");
                 case Node.CommandNode commandNode -> runCommand(commandNode);
                 case Node.CompundNode<?> compundNode -> compundNode.nodes().forEach(this::run);
-                case Node.ConstantNode constantNode -> runConstant(constantNode);
-                case Node.DosNode _ -> {}
-                case Node.EmptyNode _ -> {}
-                case Node.RegistroDeclarationNode registroDeclarationNode -> runRegistroDeclaration(registroDeclarationNode);
-                case Node.SubprogramDeclarationNode subprogramDeclarationNode -> runSubprogramDeclaration(subprogramDeclarationNode);
+                case Node.DosNode _, Node.EmptyNode _ -> {}
+                case Node.DeclarationNode declarationNode -> runDeclaration(declarationNode);
                 case Node.TypeNode _ -> throw new UnsupportedOperationException("TypeNode not implemented");
-                case Node.VariableDeclarationNode variableDeclarationNode -> runVariableDeclaration(variableDeclarationNode);
                 case Node.ExpressionNode e -> evaluate(e);
             }
-        } catch (InterruptedException | IOException | BrokenBarrierException _) {
+        } catch (IOException | InterruptedException | BrokenBarrierException _) {
             state = State.STOPPED;
+        }
+    }
+
+    public void stop() {
+        state = State.STOPPED;
+    }
+
+    private void runDeclaration(Node.DeclarationNode declarationNode) {
+        switch (declarationNode) {
+            case Node.ConstantNode constantNode -> runConstant(constantNode);
+            case Node.RegistroDeclarationNode registroDeclarationNode -> runRegistroDeclaration(registroDeclarationNode);
+            case Node.SubprogramDeclarationNode subprogramDeclarationNode -> runSubprogramDeclaration(subprogramDeclarationNode);
+            case Node.VariableDeclarationNode variableDeclarationNode -> runVariableDeclaration(variableDeclarationNode);
         }
     }
 
@@ -139,7 +148,9 @@ public class Interpreter {
     public void step() {
         try {
             if (state == State.PAUSED) {
-                lock.await();
+                if (lock.getNumberWaiting() == 1) {
+                    lock.await();
+                }
                 state = State.PAUSED;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
@@ -150,7 +161,9 @@ public class Interpreter {
     public void continueExecution() {
         try {
             if (state == State.PAUSED) {
-                lock.await();
+                if (lock.getNumberWaiting() == 1) {
+                    lock.await();
+                }
                 state = State.RUNNING;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
@@ -159,7 +172,6 @@ public class Interpreter {
     }
 
     private void handleDebugCommand(Node node) throws BrokenBarrierException, InterruptedException {
-        System.out.println("Breakpoint hit at line " + node.location().orElse(Location.EMPTY));
         if (debuggerCallback != null) {
             debuggerCallback.accept(new ProgramState(node.location().orElse(Location.EMPTY).startLine() - 1, Map.copyOf(stack)));
             lock.await();
@@ -218,7 +230,9 @@ public class Interpreter {
             case Node.EcoCommandNode ecoCommandNode -> eco = ecoCommandNode.on();
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
             case Node.InterrompaCommandNode _ -> throw new BreakException();
-            case Node.LimpatelaCommandNode _ -> {}
+            case Node.LimpatelaCommandNode _ -> {
+                io.output().accept(new OutputEvent.Clear());
+            }
             case Node.PausaCommandNode _ -> {
                 state = State.PAUSED;
                 handleDebugCommand(commandNode);
@@ -228,6 +242,16 @@ public class Interpreter {
                 if (procedureDeclaration != null) {
                     callSubprogram(procedureCallNode, procedureDeclaration);
                 } else if (procedureCallNode.name().id().equals("mudacor")) {
+                    if (procedureCallNode.args().nodes().size() != 2) {
+                        throw new TypeException.WrongNumberOfArguments(2, procedureCallNode.args().nodes().size());
+                    }
+                    try {
+                        OutputEvent.ChangeColor.Color color = OutputEvent.ChangeColor.Color.fromString(evaluate(procedureCallNode.args().nodes().getFirst()));
+                        OutputEvent.ChangeColor.Position position = OutputEvent.ChangeColor.Position.fromString(evaluate(procedureCallNode.args().nodes().getLast()));
+                        io.output().accept(new OutputEvent.ChangeColor(color, position));
+                    } catch (IllegalArgumentException _) {
+
+                    }
                 } else {
                     throw new TypeException.ProcedureNotFound(procedureCallNode.name().id());
                 }
@@ -349,7 +373,7 @@ public class Interpreter {
     private void runWriteCommandNode(Node.WriteCommandNode writeCommandNode) {
         run(writeCommandNode.writeList());
         if (writeCommandNode.newLine()) {
-            io.output().accept("\n");
+            io.output().accept(new OutputEvent.Text("\n"));
         }
     }
 
@@ -449,8 +473,8 @@ public class Interpreter {
 
             default -> throw new TypeException.MissingInput(inputRequest);
         };
-        if (eco)
-            io.output().accept(value + "\n");
+        if (eco && aleatorioEnabled)
+            io.output().accept(new OutputEvent.Text(value + "\n"));
         return value;
     }
 
@@ -478,8 +502,8 @@ public class Interpreter {
             case Boolean[] _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
             default -> throw new TypeException.MissingInput(inputRequest);
         };
-        if (eco)
-            io.output().accept(o1.toString() + "\n");
+        if (eco && aleatorioEnabled)
+            io.output().accept(new OutputEvent.Text(o1.toString() + "\n"));
         return o1;
     }
 
@@ -560,7 +584,7 @@ public class Interpreter {
         numberFormat.setRoundingMode(RoundingMode.HALF_UP);
         numberFormat.setMaximumFractionDigits(0);
         numberFormat.setMinimumFractionDigits(0);
-        io.output().accept(switch (value) {
+        String text = switch (value) {
             case Double doubleValue when spacesValue >= 1 && precisionValue >= 1 -> {
                 numberFormat.setMinimumFractionDigits(precisionValue);
                 numberFormat.setMaximumFractionDigits(precisionValue);
@@ -580,7 +604,8 @@ public class Interpreter {
             case String string -> spacesValue > 0 ? string.substring(0, spacesValue) : string;
             case Boolean bool -> bool ? " VERDADEIRO" : " FALSO";
             case null, default -> throw new TypeException("Unsupported type: " + value);
-        });
+        };
+        io.output().accept(new OutputEvent.Text(text));
 
     }
 
