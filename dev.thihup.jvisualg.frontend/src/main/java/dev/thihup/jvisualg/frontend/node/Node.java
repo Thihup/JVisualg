@@ -149,7 +149,9 @@ public sealed interface Node {
         }
     }
 
-    sealed interface SubprogramDeclarationNode extends Node {
+    sealed interface DeclarationNode extends Node {}
+
+    sealed interface SubprogramDeclarationNode extends DeclarationNode {
         IdNode name();
         CompundNode<VariableDeclarationNode> parameters();
         CompundNode<Node> declarations();
@@ -176,7 +178,7 @@ public sealed interface Node {
         }
     }
 
-    record RegistroDeclarationNode(IdNode name, CompundNode<VariableDeclarationNode> variableDeclarationContexts, Optional<Location> location) implements Node {
+    record RegistroDeclarationNode(IdNode name, CompundNode<VariableDeclarationNode> variableDeclarationContexts, Optional<Location> location) implements DeclarationNode {
         public RegistroDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(variableDeclarationContexts);
@@ -184,10 +186,18 @@ public sealed interface Node {
         }
     }
 
-    record VariableDeclarationNode(IdNode name, TypeNode type, boolean reference, Optional<Location> location) implements Node {
+    record VariableDeclarationNode(IdNode name, TypeNode type, boolean reference, Optional<Location> location) implements DeclarationNode {
         public VariableDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(type);
+            Objects.requireNonNull(location);
+        }
+    }
+
+    record ConstantNode(IdNode name, ExpressionNode value, Optional<Location> location) implements DeclarationNode {
+        public ConstantNode {
+            Objects.requireNonNull(name);
+            Objects.requireNonNull(value);
             Objects.requireNonNull(location);
         }
     }
@@ -202,14 +212,6 @@ public sealed interface Node {
 
         public CompundNode {
             Objects.requireNonNull(nodes);
-            Objects.requireNonNull(location);
-        }
-    }
-
-    record ConstantNode(IdNode name, ExpressionNode value, Optional<Location> location) implements Node {
-        public ConstantNode {
-            Objects.requireNonNull(name);
-            Objects.requireNonNull(value);
             Objects.requireNonNull(location);
         }
     }
