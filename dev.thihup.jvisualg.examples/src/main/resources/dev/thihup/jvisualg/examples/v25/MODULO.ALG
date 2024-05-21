@@ -34,6 +34,4 @@ Inicio
       ESCREVAL("N/ MULTIPLO",b)
    FIMSE
 
-
 Fimalgoritmo
-FIMSE

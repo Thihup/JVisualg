@@ -9,10 +9,10 @@ options {
 algorithm : ALGORITMO STRING declarations INICIO commands FIM_ALGORITMO;
 
 // Declarations
-declarations : (registroDeclaration | VAR (variableDeclaration SEMICOLON?)* | subprogramDeclaration  | constantsDeclaration | dos | arquivoCommand)*;
-registroDeclaration : TIPO ID EQ REGISTRO variableDeclaration* FIM_REGISTRO;
+declarations : (TIPO registroDeclaration* | VAR (variableDeclaration SEMICOLON?)* | subprogramDeclaration  | CONST constantDeclaration* | dos | arquivoCommand)*;
+registroDeclaration : ID EQ REGISTRO variableDeclaration* FIM_REGISTRO;
 variableDeclaration :  ID (COMMA ID)* COLON type ;
-constantsDeclaration: CONST (ID EQ expr SEMICOLON?)*;
+constantDeclaration: ID EQ expr SEMICOLON?;
 type : INTEIRO | REAL | CARACTERE | LOGICO | VETOR LBRACK RANGE (COMMA RANGE)* RBRACK DE type | ID;
 
 // Commands
@@ -33,8 +33,11 @@ command : assignment
         | cronometroCommand
         | limpatelaCommand
         | interrompaCommand
+        | fimAlgoritmo
         | SEMICOLON
         ;
+
+fimAlgoritmo: FIM_ALGORITMO;
 
 interrompaCommand : INTERROMPA;
 

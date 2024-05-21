@@ -65,6 +65,7 @@ public sealed interface Node {
             case NegNode(var expr, _) -> Stream.of(expr);
             case PosNode(var expr, _) -> Stream.of(expr);
 
+
             case ArrayAccessNode(var accessor, CompundNode(var nodes, _), _) -> {
                 Stream<Node> arrayNode = Stream.of(accessor);
                 Stream<ExpressionNode> indexesStream = nodes.stream();
@@ -131,7 +132,15 @@ public sealed interface Node {
             case InterrompaCommandNode _ -> Stream.of();
             case NotNode(var expr, _) -> Stream.of(expr);
             case ReturnNode(var expr, _) -> Stream.of(expr);
-            case EmptyNode _, EmptyExpressionNode _, AleatorioOffNode _, AleatorioOnNode _, InteiroType _, RealType _, CaracterType _, LogicoType _ -> Stream.of();
+            case EmptyNode _,
+                EmptyExpressionNode _,
+                AleatorioOffNode _,
+                AleatorioOnNode _,
+                InteiroType _,
+                RealType _,
+                CaracterType _,
+                LogicoType _,
+                EndAlgorithmCommand _ -> Stream.of();
         };
         return childrenNode.mapMulti((Node element, Consumer<Node>  downstream) -> {
             downstream.accept(element);
@@ -276,6 +285,8 @@ public sealed interface Node {
     }
 
     sealed interface CommandNode extends Node {}
+
+    record EndAlgorithmCommand(Optional<Location> location) implements CommandNode {}
 
     record InterrompaCommandNode(Optional<Location> location) implements CommandNode {
         public InterrompaCommandNode {

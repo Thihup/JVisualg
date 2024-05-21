@@ -125,7 +125,7 @@ public class Main extends Application {
                 switch (interpreter.state()) {
                     case RUNNING -> {
                     }
-                    case PAUSED -> interpreter.continueExecution();
+                    case PAUSED_DEBUG -> interpreter.continueExecution();
                     case STOPPED -> {
                         resetExecution();
 
@@ -413,7 +413,7 @@ public class Main extends Application {
                 case F9 -> runButton.fire();
                 case F8 -> {
                     switch (interpreter.state()) {
-                        case PAUSED -> {
+                        case PAUSED_DEBUG -> {
                             interpreter.step();
                         }
                         case STOPPED -> {
@@ -426,9 +426,7 @@ public class Main extends Application {
                 }
                 case ESCAPE -> {
                     switch (interpreter.state()) {
-                        case STOPPED -> dosWindow.hide();
-                        default -> {
-                        }
+                        case STOPPED, COMPLETED_EXCEPTIONALLY, COMPLETED_SUCCESSFULLY -> dosWindow.hide();
                     }
                 }
                 default -> {

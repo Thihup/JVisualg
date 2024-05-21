@@ -465,14 +465,14 @@ class InterpreterTest extends ExamplesBase {
     }
 
     @ParameterizedTest
-    @MethodSource({"examplesV25", "examplesV30"})
+    @MethodSource({"examplesV25", "examplesV30", "examplesCustom"})
     void testExamples(Path path) throws Throwable {
         RandomGenerator aDefault = RandomGenerator.getDefault();
 
         IO io = new IO(
                 inputRequest -> CompletableFuture.completedFuture(switch (inputRequest.type()) {
-                    case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(10));
-                    case REAL -> new InputValue.RealValue(aDefault.nextDouble(10));
+                    case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(1, 10));
+                    case REAL -> new InputValue.RealValue(aDefault.nextDouble(1, 10));
                     case LOGICO -> new InputValue.LogicoValue(aDefault.nextBoolean());
                     case CARACTER -> new InputValue.CaracterValue(aDefault.ints(65, 91)
                             .limit(5)

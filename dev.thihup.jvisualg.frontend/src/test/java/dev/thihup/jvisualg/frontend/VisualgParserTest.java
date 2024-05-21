@@ -10,16 +10,8 @@ import java.nio.file.Path;
 class VisualgParserTest extends ExamplesBase {
 
     @ParameterizedTest
-    @MethodSource("examplesV25")
-    void testExamplesV25(Path path) throws Throwable {
-        ASTResult astResult = VisualgParser.parse(Files.newInputStream(path));
-        TypeCheckerResult typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
-        typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));
-    }
-
-    @ParameterizedTest
-    @MethodSource("examplesV30")
-    void testExamplesV30(Path path) throws Throwable {
+    @MethodSource({"examplesV25", "examplesV30", "examplesCustom"})
+    void testExamples(Path path) throws Throwable {
         ASTResult astResult = VisualgParser.parse(Files.newInputStream(path));
         TypeCheckerResult typecheckResult = TypeChecker.semanticAnalysis(astResult.node().get());
         typecheckResult.errors().forEach(x -> System.out.println(path.toString().replace('\\', '/') + ":" + x));

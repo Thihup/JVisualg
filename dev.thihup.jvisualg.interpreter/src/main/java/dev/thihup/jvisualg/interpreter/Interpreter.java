@@ -33,9 +33,12 @@ public class Interpreter {
     private List<Integer> breakpoints = new ArrayList<>();
 
     public enum State {
+        STOPPED,
         RUNNING,
-        PAUSED,
-        STOPPED
+        PAUSED_DEBUG,
+        COMPLETED_SUCCESSFULLY,
+        COMPLETED_EXCEPTIONALLY,
+        FORCED_STOP
     }
     private volatile State state = State.STOPPED;
 
@@ -85,44 +88,52 @@ public class Interpreter {
                         throw new RuntimeException("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n")));
                     });
 
-        }, executorService).whenComplete((_, _) -> {
+        }, executorService).whenComplete((_, exception) -> {
             if (debuggerCallback != null) {
                 debuggerCallback.accept(new ProgramState(0, stack));
             }
-            state = State.STOPPED;
+            state = exception != null ? State.COMPLETED_SUCCESSFULLY : State.COMPLETED_EXCEPTIONALLY;
         });
     }
 
     private void run(Node node) {
-        if (state == State.STOPPED) {
-            throw new CancellationException("Program was cancelled");
-        }
         try {
-            if (state != State.PAUSED && breakpoints.contains(node.location().orElse(Location.EMPTY).startLine()) &&
-                !(node instanceof Node.CompundNode<?>)) {
-                state = State.PAUSED;
+            switch (state) {
+                case FORCED_STOP -> throw new CancellationException("Program was cancelled");
+                case COMPLETED_SUCCESSFULLY -> {
+                    return;
+                }
+                case PAUSED_DEBUG -> handleDebugCommand(node);
             }
 
-            if (state == State.PAUSED) {
+            if (state != State.PAUSED_DEBUG && breakpoints.contains(node.location().orElse(Location.EMPTY).startLine()) &&
+                !(node instanceof Node.CompundNode<?>)) {
+                state = State.PAUSED_DEBUG;
                 handleDebugCommand(node);
             }
 
             switch (node) {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
                 case Node.CommandNode commandNode -> runCommand(commandNode);
-                case Node.CompundNode<?> compundNode -> compundNode.nodes().forEach(this::run);
+                case Node.CompundNode<?> compundNode -> runCompundNode(compundNode);
                 case Node.DosNode _, Node.EmptyNode _ -> {}
                 case Node.DeclarationNode declarationNode -> runDeclaration(declarationNode);
                 case Node.TypeNode _ -> throw new UnsupportedOperationException("TypeNode not implemented");
                 case Node.ExpressionNode e -> evaluate(e);
             }
         } catch (IOException | InterruptedException | BrokenBarrierException _) {
-            state = State.STOPPED;
+            state = State.COMPLETED_EXCEPTIONALLY;
+        } catch (StopExecutionException _) {
+            state = State.COMPLETED_SUCCESSFULLY;
         }
     }
 
+    private void runCompundNode(Node.CompundNode<?> compundNode) {
+        compundNode.nodes().forEach(this::run);
+    }
+
     public void stop() {
-        state = State.STOPPED;
+        state = State.FORCED_STOP;
     }
 
     private void runDeclaration(Node.DeclarationNode declarationNode) {
@@ -147,11 +158,11 @@ public class Interpreter {
 
     public void step() {
         try {
-            if (state == State.PAUSED) {
+            if (state == State.PAUSED_DEBUG) {
                 if (lock.getNumberWaiting() == 1) {
                     lock.await();
                 }
-                state = State.PAUSED;
+                state = State.PAUSED_DEBUG;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
@@ -160,7 +171,7 @@ public class Interpreter {
 
     public void continueExecution() {
         try {
-            if (state == State.PAUSED) {
+            if (state == State.PAUSED_DEBUG) {
                 if (lock.getNumberWaiting() == 1) {
                     lock.await();
                 }
@@ -227,6 +238,7 @@ public class Interpreter {
             case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
             case Node.CronometroCommandNode _ -> {}
             case Node.DebugCommandNode debugCommandNode -> runDebugCommand(debugCommandNode);
+            case Node.EndAlgorithmCommand _ -> throw new StopExecutionException();
             case Node.EcoCommandNode ecoCommandNode -> eco = ecoCommandNode.on();
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
             case Node.InterrompaCommandNode _ -> throw new BreakException();
@@ -234,7 +246,7 @@ public class Interpreter {
                 io.output().accept(new OutputEvent.Clear());
             }
             case Node.PausaCommandNode _ -> {
-                state = State.PAUSED;
+                state = State.PAUSED_DEBUG;
                 handleDebugCommand(commandNode);
             }
             case Node.ProcedureCallNode procedureCallNode -> {
@@ -280,22 +292,8 @@ public class Interpreter {
 
     private void runDebugCommand(Node.DebugCommandNode debugCommandNode) throws BrokenBarrierException, InterruptedException {
         if (evaluate(debugCommandNode.expr())) {
-            state = State.PAUSED;
+            state = State.PAUSED_DEBUG;
             handleDebugCommand(debugCommandNode);
-        }
-    }
-
-    private static class BreakException extends RuntimeException {
-        @Override
-        public synchronized Throwable fillInStackTrace() {
-            return this;
-        }
-    }
-
-    private static class ReturnException extends RuntimeException {
-        @Override
-        public synchronized Throwable fillInStackTrace() {
-            return this;
         }
     }
 

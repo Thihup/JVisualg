@@ -136,12 +136,8 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
 
     @Override
-    public Node visitConstantsDeclaration(VisuAlgParser.ConstantsDeclarationContext ctx) {
-        List<ConstantNode> constants = new ArrayList<>();
-        for (int i = 0; i < ctx.ID().size(); i++) {
-            constants.add(new ConstantNode(visitId(ctx.ID(i)), visitExpr(ctx.expr(i)), fromRuleContext(ctx.expr(i))));
-        }
-        return new CompundNode<>(constants, fromRuleContext(ctx));
+    public Node visitConstantDeclaration(VisuAlgParser.ConstantDeclarationContext ctx) {
+        return new ConstantNode(visitId(ctx.ID()), visitExpr(ctx.expr()), fromRuleContext(ctx));
     }
 
 
@@ -226,6 +222,11 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         return (Node.CommandNode) visit(ctx.getChild(0));
     }
 
+
+    @Override
+    public Node visitFimAlgoritmo(VisuAlgParser.FimAlgoritmoContext ctx) {
+        return new EndAlgorithmCommand(fromRuleContext(ctx));
+    }
 
     @Override
     public Node visitInterrompaCommand(VisuAlgParser.InterrompaCommandContext ctx) {

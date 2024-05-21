@@ -18,6 +18,10 @@ public class ExamplesBase {
         return examples("v30");
     }
 
+    static Stream<Path> examplesCustom() throws Throwable {
+        return examples("custom");
+    }
+
     public static Stream<Path> examples(String folder) throws Throwable {
         URI start = ExamplesBase.class.getResource(folder).toURI();
         try {
