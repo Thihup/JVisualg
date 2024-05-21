@@ -338,10 +338,10 @@ public class Interpreter {
             case Node.MemberAccessNode memberAccessNode -> {
                 Object evaluateMember = evaluate(memberAccessNode.node());
                 if (!(evaluateMember instanceof UserDefinedValue userDefinedValue)) {
-                    throw new UnsupportedOperationException("Unsupported type: " + evaluate.getClass());
+                    throw unsupportedType(evaluate);
                 }
                 if (!(memberAccessNode.member() instanceof Node.IdNode idNode)) {
-                    throw new UnsupportedOperationException("Unsupported type: " + memberAccessNode.member().getClass());
+                    throw unsupportedType(memberAccessNode.member());
                 }
                 UserDefinedType userDefinedType = userDefinedValue.type();
                 Node.TypeNode typeNode = userDefinedType.fields().get(idNode.id());
@@ -362,7 +362,7 @@ public class Interpreter {
 
                 userDefinedValue.values().put(idNode.id(), valueToAssign);
             }
-            case null, default -> throw new UnsupportedOperationException("Unsupported type: " + assignmentNode);
+            case null, default -> throw unsupportedType(assignmentNode);
         }
     }
 
@@ -432,13 +432,13 @@ public class Interpreter {
                         default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
                     }
                 }
-                case Node.MemberAccessNode(Node.ExpressionNode node, Node member, Optional<Location> location) -> {
+                case Node.MemberAccessNode(Node.ExpressionNode node, Node member, _) -> {
                     Object evaluate = evaluate(node);
                     if (!(evaluate instanceof UserDefinedValue userDefinedValue)) {
-                        throw new UnsupportedOperationException("Unsupported type: " + evaluate.getClass());
+                        throw unsupportedType(evaluate);
                     }
                     if (!(member instanceof Node.IdNode idNode)) {
-                        throw new UnsupportedOperationException("Unsupported type: " + member.getClass());
+                        throw unsupportedType(member);
                     }
                     UserDefinedType userDefinedType = userDefinedValue.type();
                     Node.TypeNode typeNode = userDefinedType.fields().get(idNode.id());
@@ -450,7 +450,7 @@ public class Interpreter {
                     Object value = readValue(inputRequest, userDefinedValue.values().get(idNode.id()), aleatorioEnabled);
                     userDefinedValue.values().put(idNode.id(), value);
                 }
-                default -> throw new UnsupportedOperationException("Unsupported type: " + expr.getClass());
+                default -> throw unsupportedType(expr);
             }
         });
 
@@ -558,7 +558,7 @@ public class Interpreter {
                 assignVariable(id.id(), i, AssignContext.SIMPLE);
             }
 
-            default -> throw new UnsupportedOperationException("Unsupported type: " + forCommandNode.getClass());
+            default -> throw unsupportedType(forCommandNode);
         }
     }
 
@@ -571,13 +571,13 @@ public class Interpreter {
         int spacesValue = switch (spaces) {
             case Node.ExpressionNode e when evaluate(e) instanceof Number p -> p.intValue();
             case Node.EmptyNode _ -> 0;
-            default -> throw new TypeException("Unsupported type: " + precision.getClass());
+            default -> throw unsupportedType(spaces);
         };
 
         int precisionValue = switch (precision) {
             case Node.ExpressionNode e when evaluate(e) instanceof Number p -> p.intValue();
             case Node.EmptyNode _ -> 0;
-            default -> throw new TypeException("Unsupported type: " + precision.getClass());
+            default -> throw unsupportedType(precision);
         };
 
         NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.US);
@@ -603,7 +603,7 @@ public class Interpreter {
 
             case String string -> spacesValue > 0 ? string.substring(0, spacesValue) : string;
             case Boolean bool -> bool ? " VERDADEIRO" : " FALSO";
-            case null, default -> throw new TypeException("Unsupported type: " + value);
+            case null, default -> throw unsupportedType(value);
         };
         io.output().accept(new OutputEvent.Text(text));
 
@@ -649,12 +649,14 @@ public class Interpreter {
             case null, default -> throw new TypeException.InvalidOperand(Operator.NOT, notNode.expr().getClass());
         };
     }
-
+    private static UnsupportedOperationException unsupportedType(Object evaluate) {
+        return new UnsupportedOperationException("Unsupported type: " + evaluate);
+    }
     private Object evaluateNegNode(Node.NegNode nedNode) {
         return switch (evaluate(nedNode.expr())) {
             case Double d -> -d;
             case Integer i -> -i;
-            case null, default -> throw new UnsupportedOperationException("Unsupported type: " + nedNode.expr().getClass());
+            case null, default -> throw unsupportedType(nedNode.expr());
         };
     }
 
@@ -752,7 +754,7 @@ public class Interpreter {
             case Double d -> new Node.RealLiteralNode(d, Optional.empty());
             case Integer d -> new Node.IntLiteralNode(d, Optional.empty());
             case Boolean d -> new Node.BooleanLiteralNode(d, Optional.empty());
-            default -> throw new UnsupportedOperationException("Unsupported type: " + value);
+            default -> throw unsupportedType(value);
         };
     }
 
