@@ -174,17 +174,25 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
     @Override
     public TypeNode visitType(VisuAlgParser.TypeContext ctx) {
         TerminalNode vetor = ctx.VETOR();
-        if (vetor == null)
-            return new TypeNodeImpl(new StringLiteralNode(ctx.getText(), fromRuleContext(ctx)), fromRuleContext(ctx));
+        Optional<Location> location = fromRuleContext(ctx);
+        if (vetor == null) {
+            return switch (ctx.getText().toLowerCase()) {
+                case "inteiro" -> new InteiroType(location);
+                case "real", "numerico" -> new RealType(location);
+                case "logico" -> new LogicoType(location);
+                case "caractere", "caracter", "literal" -> new CaracterType(location);
+                default -> new UserDefinedType(new StringLiteralNode(ctx.getText(), location), location);
+            };
+        }
         List<TerminalNode> range = ctx.RANGE();
 
-        CompundNode<Node> list = range.stream()
+        CompundNode<RangeNode> list = range.stream()
                 .map(this::rangeToNode)
-                .collect(toCompundNode(fromRuleContext(ctx)));
-        return new ArrayTypeNode(visitType(ctx.type()), list, fromRuleContext(ctx));
+                .collect(toCompundNode(location));
+        return new ArrayTypeNode(visitType(ctx.type()), list, location);
     }
 
-    private Node rangeToNode(TerminalNode ctx) {
+    private RangeNode rangeToNode(TerminalNode ctx) {
         String[] values = ctx.getText().split("\\.\\.");
         assert values.length == 2;
         ExpressionNode min, max;

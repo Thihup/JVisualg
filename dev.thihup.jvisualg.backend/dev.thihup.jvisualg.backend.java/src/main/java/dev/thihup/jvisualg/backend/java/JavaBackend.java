@@ -37,14 +37,12 @@ public class JavaBackend {
             case Node.ConstantNode(Node.IdNode name, Node.BooleanLiteralNode(boolean value, _), _) ->
                     "private static final boolean %s = %s;".formatted(name.id(), value);
 
+            case Node.InteiroType _ -> "int"; 
+            case Node.RealType _ -> "double"; 
+            case Node.CaracterType _ -> "String"; 
+            case Node.LogicoType _ -> "boolean"; 
 
-            case Node.TypeNodeImpl(Node.StringLiteralNode(String type, _), _) -> switch (type.toLowerCase()) {
-                case "inteiro" -> "int";
-                case "real" -> "double";
-                case "caracter", "caractere", "literal" -> "String";
-                case "logico" -> "boolean";
-                default -> type;
-            };
+            case Node.UserDefinedType(Node.StringLiteralNode(String type, _), _) -> type;
 
             case Node.InterrompaCommandNode(_) -> "break;";
 

@@ -1007,12 +1007,12 @@ public class Interpreter {
 
     private Class<?> getType(Node typeNode) {
         return switch (typeNode) {
-            case Node.TypeNodeImpl(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
-                case "inteiro" -> Integer.class;
-                case "real", "numerico" -> Double.class;
-                case "caracter", "caractere", "literal" -> String.class;
-                case "logico" -> Boolean.class;
-                case String s -> {
+            case Node.InteiroType _ -> Integer.class;
+            case Node.RealType _ -> Double.class;
+            case Node.CaracterType _ -> String.class;
+            case Node.LogicoType _ -> Boolean.class;
+            case Node.UserDefinedType(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
+                    case String s -> {
                     if (!userDefinedTypeMap.containsKey(s)) {
                         throw new TypeException.TypeNotFound(s);
                     }
@@ -1023,13 +1023,14 @@ public class Interpreter {
         };
     }
 
-    private Object newInstance(Node typeNode) {
+    private Object newInstance(Node.TypeNode typeNode) {
         return switch (typeNode) {
-            case Node.TypeNodeImpl(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
-                case "inteiro" -> 0;
-                case "real", "numerico" -> 0.0;
-                case "caracter", "caractere", "literal" -> "";
-                case "logico" -> false;
+
+            case Node.InteiroType _ -> 0;
+            case Node.RealType _ -> 0.0;
+            case Node.CaracterType _ -> "";
+            case Node.LogicoType _ -> false;
+            case Node.UserDefinedType(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
                 case String s -> {
                     if (!userDefinedTypeMap.containsKey(s)) {
                         throw new TypeException.TypeNotFound(s);
@@ -1042,12 +1043,14 @@ public class Interpreter {
                     yield new UserDefinedValue(userDefinedType, collect);
                 }
             };
-            case Node.ArrayTypeNode(Node.TypeNode type, Node.CompundNode<Node> sizes, _) -> {
+            case Node.ArrayTypeNode(Node.TypeNode type, Node.CompundNode<Node.RangeNode> sizes, _) -> {
                 Class<?> typeClass = getType(type);
                 int[] dimensions = sizes.nodes().stream()
-                        .map(Node.RangeNode.class::cast)
-                        .mapToInt(node -> (Integer)evaluate(node.end()) + 2)
+                        .mapToInt(node -> (Integer) evaluate(node.end()) + 2)
                         .toArray();
+
+
+
                 Object o = Array.newInstance(typeClass, dimensions);
                 switch (o) {
                     case String[] stringArray -> Arrays.fill(stringArray, newInstance(type));
@@ -1058,15 +1061,18 @@ public class Interpreter {
 
                     case String[][] stringArray ->
                             Arrays.stream(stringArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case Integer[][] intArray -> Arrays.stream(intArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case Double[][] doubleArray -> Arrays.stream(doubleArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case Boolean[][] booleanArray -> Arrays.stream(booleanArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case UserDefinedValue[][] userDefinedArray -> Arrays.stream(userDefinedArray).forEach(x -> Arrays.setAll(x, _ -> newInstance(type)));
+                    case Integer[][] intArray ->
+                            Arrays.stream(intArray).forEach(x -> Arrays.fill(x, newInstance(type)));
+                    case Double[][] doubleArray ->
+                            Arrays.stream(doubleArray).forEach(x -> Arrays.fill(x, newInstance(type)));
+                    case Boolean[][] booleanArray ->
+                            Arrays.stream(booleanArray).forEach(x -> Arrays.fill(x, newInstance(type)));
+                    case UserDefinedValue[][] userDefinedArray ->
+                            Arrays.stream(userDefinedArray).forEach(x -> Arrays.setAll(x, _ -> newInstance(type)));
                     default -> throw new UnsupportedOperationException("Unexpected value: " + o);
                 }
                 yield o;
             }
-            default -> throw new UnsupportedOperationException("Unexpected value: " + typeNode);
         };
     }
 }

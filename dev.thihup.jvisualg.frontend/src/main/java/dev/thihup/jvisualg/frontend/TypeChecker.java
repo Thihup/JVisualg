@@ -221,7 +221,7 @@ public class TypeChecker {
             errors.add(new Error("Procedure " + procedureDeclarationNode.name().id() + " already declared", procedureDeclarationNode.location().orElse(Location.EMPTY)));
         } else {
             SequencedMap<String, Declaration.Variable> parameters = procedureDeclarationNode.parameters().nodes().stream()
-                    .filter(x -> x instanceof Node.VariableDeclarationNode)
+                    .filter(Objects::nonNull)
                     .map(Node.VariableDeclarationNode.class::cast)
                     .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location().orElse(Location.EMPTY)))
                     .collect(Collectors.toMap(Declaration.Variable::name, x -> x, (a, _) -> a, LinkedHashMap::new));
@@ -241,7 +241,7 @@ public class TypeChecker {
         } else {
             Type returnType = getType(functionDeclarationNode.returnType(), scope, errors);
             SequencedMap<String, Declaration.Variable> parameters = functionDeclarationNode.parameters().nodes().stream()
-                    .filter(x -> x instanceof Node.VariableDeclarationNode)
+                    .filter(Objects::nonNull)
                     .map(Node.VariableDeclarationNode.class::cast)
                     .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location().orElse(Location.EMPTY)))
                     .collect(Collectors.toMap(Declaration.Variable::name, x -> x, (a, _) -> a, LinkedHashMap::new));
@@ -377,15 +377,13 @@ public class TypeChecker {
         if (!areNumbers(type, REAL) && type != CARACTERE) {
             errors.add(new Error("Choose command with non-integer type: " + type, commandNode.expr().location().orElse(Location.EMPTY)));
         }
-        commandNode.cases().nodes().forEach(cases -> {
-            cases.value().nodes().forEach(caseNode -> {
-                if (!areTypesCompatible(type, getType(caseNode, scope, errors))) {
-                    errors.add(new Error("Choose case with different types: " + type + " and " + getType(caseNode, scope, errors), caseNode.location().orElse(Location.EMPTY)));
-                } else {
-                    cases.commands().nodes().forEach(caseCommand -> typeCheckCommand(caseCommand, scope, errors));
-                }
-            });
-        });
+        commandNode.cases().nodes().forEach(cases -> cases.value().nodes().forEach(caseNode -> {
+            if (!areTypesCompatible(type, getType(caseNode, scope, errors))) {
+                errors.add(new Error("Choose case with different types: " + type + " and " + getType(caseNode, scope, errors), caseNode.location().orElse(Location.EMPTY)));
+            } else {
+                cases.commands().nodes().forEach(caseCommand -> typeCheckCommand(caseCommand, scope, errors));
+            }
+        }));
     }
 
     private static void handleTimerCommand(List<Error> errors, Node.TimerCommandNode timerCommandNode) {
@@ -396,10 +394,10 @@ public class TypeChecker {
 
     private static void handleAleatorioCommandNode(List<Error> errors, Node.AleatorioNode aleatorioRangeNode) {
         switch (aleatorioRangeNode) {
-            case Node.AleatorioOffNode aleatorioOffNode -> {
+            case Node.AleatorioOffNode _ -> {
 
             }
-            case Node.AleatorioOnNode aleatorioOnNode -> {
+            case Node.AleatorioOnNode _ -> {
             }
             case Node.AleatorioRangeNode rangeNode -> {
                 Type startType = getType(rangeNode.start(), null, errors);
@@ -666,21 +664,19 @@ public class TypeChecker {
         return switch (node) {
             case Node.EmptyNode _ -> Type.PrimitiveTypes.UNDEFINED;
             case Node.EmptyExpressionNode _ -> UNDECLARED;
-            case Node.TypeNodeImpl(Node.StringLiteralNode(String stringValue, _), var location) -> switch (stringValue.toLowerCase()) {
-                case "inteiro" -> Type.PrimitiveTypes.INTEIRO;
-                case "real", "numerico" -> Type.PrimitiveTypes.REAL;
-                case "logico" -> Type.PrimitiveTypes.LOGICO;
-                case "caractere", "caracter", "literal" -> CARACTERE;
-                default -> {
-                    Optional<Declaration.UserDefinedType> userDefinedType = scope.type(stringValue);
-                    if (userDefinedType.isPresent()) {
-                        yield userDefinedType.get();
-                    } else {
-                        errors.add(new Error("Type " + stringValue + " not declared", location.orElse(Location.EMPTY)));
-                        yield Type.PrimitiveTypes.UNDECLARED;
-                    }
+            case Node.InteiroType _ -> Type.PrimitiveTypes.INTEIRO;
+            case Node.RealType _ -> Type.PrimitiveTypes.REAL;
+            case Node.LogicoType _ -> Type.PrimitiveTypes.LOGICO;
+            case Node.CaracterType _ -> CARACTERE;
+            case Node.UserDefinedType(Node.StringLiteralNode(String stringValue, _), var location) -> {
+                Optional<Declaration.UserDefinedType> userDefinedType = scope.type(stringValue.toLowerCase());
+                if (userDefinedType.isPresent()) {
+                    yield userDefinedType.get();
+                } else {
+                    errors.add(new Error("Type " + stringValue + " not declared", location.orElse(Location.EMPTY)));
+                    yield Type.PrimitiveTypes.UNDECLARED;
                 }
-            };
+            }
             case Node.ArrayAccessNode arrayAccessNode -> {
                 Type idType = getType(arrayAccessNode.node(), scope, errors);
                 if (idType instanceof Type.Array arrayType) {

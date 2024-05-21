@@ -119,10 +119,10 @@ public sealed interface Node {
             case ArquivoCommandNode arquivoCommandNode -> Stream.of(arquivoCommandNode.name());
             case TimerCommandNode _, PausaCommandNode _, EcoCommandNode _,
                  CronometroCommandNode _, LimpatelaCommandNode _ -> Stream.of();
-            case TypeNodeImpl(var type, _) -> Stream.of(type);
+            case UserDefinedType(var type, _) -> Stream.of(type);
             case ArrayTypeNode(var type, CompundNode(var nodes, _), _) -> {
                 Stream<Node> typeStream = Stream.of(type);
-                Stream<Node> sizes = nodes.stream();
+                Stream<RangeNode> sizes = nodes.stream();
                 yield Stream.concat(typeStream, sizes);
             }
             case AssignmentNode assignmentNode ->
@@ -131,7 +131,7 @@ public sealed interface Node {
             case InterrompaCommandNode _ -> Stream.of();
             case NotNode(var expr, _) -> Stream.of(expr);
             case ReturnNode(var expr, _) -> Stream.of(expr);
-            case EmptyNode _, EmptyExpressionNode _, AleatorioOffNode _, AleatorioOnNode _ -> Stream.of();
+            case EmptyNode _, EmptyExpressionNode _, AleatorioOffNode _, AleatorioOnNode _, InteiroType _, RealType _, CaracterType _, LogicoType _ -> Stream.of();
         };
         return childrenNode.mapMulti((Node element, Consumer<Node>  downstream) -> {
             downstream.accept(element);
@@ -158,7 +158,7 @@ public sealed interface Node {
         CompundNode<CommandNode> commands();
     }
 
-    record FunctionDeclarationNode(IdNode name, Node returnType, CompundNode<VariableDeclarationNode> parameters, CompundNode<Node> declarations,CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
+    record FunctionDeclarationNode(IdNode name, Node.TypeNode returnType, CompundNode<VariableDeclarationNode> parameters, CompundNode<Node> declarations,CompundNode<CommandNode> commands, Optional<Location> location) implements SubprogramDeclarationNode {
         public FunctionDeclarationNode {
             Objects.requireNonNull(name);
             Objects.requireNonNull(returnType);
@@ -248,14 +248,26 @@ public sealed interface Node {
 
     sealed interface TypeNode extends Node {}
 
-    record TypeNodeImpl(StringLiteralNode type, Optional<Location> location) implements TypeNode {
-        public TypeNodeImpl {
+    sealed interface PrimitiveType extends TypeNode {}
+
+    sealed interface NumberType extends PrimitiveType {}
+
+    record InteiroType(Optional<Location> location) implements NumberType {}
+
+    record RealType(Optional<Location> location) implements NumberType {}
+
+    record CaracterType(Optional<Location> location) implements PrimitiveType {}
+
+    record LogicoType(Optional<Location> location) implements PrimitiveType {}
+
+    record UserDefinedType(StringLiteralNode type, Optional<Location> location) implements TypeNode {
+        public UserDefinedType {
             Objects.requireNonNull(type);
             Objects.requireNonNull(location);
         }
     }
 
-    record ArrayTypeNode(TypeNode type, CompundNode<Node> sizes, Optional<Location> location) implements TypeNode {
+    record ArrayTypeNode(TypeNode type, CompundNode<RangeNode> sizes, Optional<Location> location) implements TypeNode {
         public ArrayTypeNode {
             Objects.requireNonNull(type);
             Objects.requireNonNull(sizes);

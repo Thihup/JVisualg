@@ -20,71 +20,77 @@ class InterpreterTest extends ExamplesBase {
     @Test
     void test() {
         StringWriter stringWriter = new StringWriter();
-        IO io = new IO(_ -> null, stringWriter::write);
+        IO io = new IO(_ -> null, s -> {
+            switch (s) {
+                case OutputEvent.Text(String text) -> stringWriter.write(text);
+                case OutputEvent.ChangeColor _, OutputEvent.Clear _ -> {
+                }
+            }
+        });
         new Interpreter(io)
-            .run("""
-                algoritmo "Teste"
-                var
-                a: inteiro
-                inicio
-                escreval("Hello, World!", 5)
-                
-                escreval(5)
-                escreval(5.1)
-                escreval(5.10)
-                escreval(5.100)
-                escreval(5.1000)
-                
-                escreval(6.12)
-                escreval(6.125)
-                escreval(6.1258)
-                escreval(6.20000)
-                
-                para a de 0 ate 10 faca
-                   escreval("VALOR ESPACO", a)
-                   escreval(5 : a)
-                   escreval(5.1 : a)
-                   escreval(5.10 : a)
-                   escreval(5.100 : a)
-                   escreval(5.1000 : a)
-                
-                   escreval(6.12 : a)
-                   escreval(6.125 : a)
-                   escreval(6.1258 : a)
-                   escreval(6.20000 : a)
-                
-                   escreval("VALOR ESPACO E PRECISAO", a)
-                   escreval(5 : a : a)
-                   escreval(5.1 : a : a)
-                   escreval(5.10 : a : a)
-                   escreval(5.100 : a : a)
-                   escreval(5.1000 : a : a)
-                
-                   escreval(6.12 : a : a)
-                   escreval(6.125 : a : a)
-                   escreval(6.1258 : a : a)
-                   escreval(6.20000 : a : a)
-                
-                   escreval("VALOR ESPACO 0 E PRECISAO", a)
-                   escreval(5 : 0 : a)
-                   escreval(5.1 : 0 : a)
-                   escreval(5.10 : 0 : a)
-                   escreval(5.100 : 0 : a)
-                   escreval(5.1000 : 0 : a)
-                
-                   escreval(6.12 : 0 : a)
-                   escreval(6.125 : 0 : a)
-                   escreval(6.1258 : 0 : a)
-                   escreval(6.20000 : 0 : a)
-                fimpara
-                
-                escreval(verdadeiro)
-                escreval(falso)
-                escreval(a)
-                fimalgoritmo
-                """, Executors.newVirtualThreadPerTaskExecutor()).join();
+                .run("""
+                        algoritmo "Teste"
+                        var
+                        a: inteiro
+                        inicio
+                        escreval("Hello, World!", 5)
+                        
+                        escreval(5)
+                        escreval(5.1)
+                        escreval(5.10)
+                        escreval(5.100)
+                        escreval(5.1000)
+                        
+                        escreval(6.12)
+                        escreval(6.125)
+                        escreval(6.1258)
+                        escreval(6.20000)
+                        
+                        para a de 0 ate 10 faca
+                           escreval("VALOR ESPACO", a)
+                           escreval(5 : a)
+                           escreval(5.1 : a)
+                           escreval(5.10 : a)
+                           escreval(5.100 : a)
+                           escreval(5.1000 : a)
+                        
+                           escreval(6.12 : a)
+                           escreval(6.125 : a)
+                           escreval(6.1258 : a)
+                           escreval(6.20000 : a)
+                        
+                           escreval("VALOR ESPACO E PRECISAO", a)
+                           escreval(5 : a : a)
+                           escreval(5.1 : a : a)
+                           escreval(5.10 : a : a)
+                           escreval(5.100 : a : a)
+                           escreval(5.1000 : a : a)
+                        
+                           escreval(6.12 : a : a)
+                           escreval(6.125 : a : a)
+                           escreval(6.1258 : a : a)
+                           escreval(6.20000 : a : a)
+                        
+                           escreval("VALOR ESPACO 0 E PRECISAO", a)
+                           escreval(5 : 0 : a)
+                           escreval(5.1 : 0 : a)
+                           escreval(5.10 : 0 : a)
+                           escreval(5.100 : 0 : a)
+                           escreval(5.1000 : 0 : a)
+                        
+                           escreval(6.12 : 0 : a)
+                           escreval(6.125 : 0 : a)
+                           escreval(6.1258 : 0 : a)
+                           escreval(6.20000 : 0 : a)
+                        fimpara
+                        
+                        escreval(verdadeiro)
+                        escreval(falso)
+                        escreval(a)
+                        fimalgoritmo
+                        """, Executors.newVirtualThreadPerTaskExecutor()).join();
         assertEquals(
-                        """
+                """
                         Hello, World! 5
                          5
                          5.1
@@ -434,7 +440,13 @@ class InterpreterTest extends ExamplesBase {
     @Test
     void testRead() {
         StringWriter stringWriter = new StringWriter();
-        Interpreter interpreter = new Interpreter(new IO(_ -> CompletableFuture.completedFuture(new InputValue.InteiroValue(5)), stringWriter::write));
+        Interpreter interpreter = new Interpreter(new IO(_ -> CompletableFuture.completedFuture(new InputValue.InteiroValue(5)), s -> {
+            switch (s) {
+                case OutputEvent.Text(String text) -> stringWriter.write(text);
+                case OutputEvent.ChangeColor _, OutputEvent.Clear _ -> {
+                }
+            }
+        }));
         interpreter.run("""
                 algoritmo "Teste"
                 var
@@ -448,8 +460,7 @@ class InterpreterTest extends ExamplesBase {
 
         assertEquals(
                 """
-                Number: 5
-                 5
+                Number:  5
                 """, stringWriter.toString());
     }
 
@@ -459,15 +470,16 @@ class InterpreterTest extends ExamplesBase {
         RandomGenerator aDefault = RandomGenerator.getDefault();
 
         IO io = new IO(
-            inputRequest -> CompletableFuture.completedFuture(switch (inputRequest.type()) {
-                case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(10));
-                case REAL -> new InputValue.RealValue(aDefault.nextDouble(10));
-                case LOGICO -> new InputValue.LogicoValue(aDefault.nextBoolean());
-                case CARACTER ->  new InputValue.CaracterValue(aDefault.ints(65, 91)
-                        .limit(5)
-                        .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
-            })
-        , _ -> {});
+                inputRequest -> CompletableFuture.completedFuture(switch (inputRequest.type()) {
+                    case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(10));
+                    case REAL -> new InputValue.RealValue(aDefault.nextDouble(10));
+                    case LOGICO -> new InputValue.LogicoValue(aDefault.nextBoolean());
+                    case CARACTER -> new InputValue.CaracterValue(aDefault.ints(65, 91)
+                            .limit(5)
+                            .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
+                })
+                , _ -> {
+        });
 
         Interpreter interpreter = new Interpreter(io);
 
