@@ -184,15 +184,19 @@ public class Main extends Application {
                     entry.getValue().forEach((variableName, variableValue) -> {
                         final String scopeName = entry.getKey().toUpperCase();
                         final String variableNameUpperCase = variableName.toUpperCase();
-                        switch (variableValue) {
-                            case Object[][] multiObjects ->
-                                    addMultiArrayDebug(scopeName, variableNameUpperCase, consumer, multiObjects);
-                            case Object[] objects -> addArrayDebug(scopeName, variableNameUpperCase, consumer, objects);
-                            case Object _ -> addObjectDebug(scopeName, variableNameUpperCase, consumer, variableValue);
-                        }
+                        addDebug(consumer, variableValue, scopeName, variableNameUpperCase);
                     });
                 })
                 .forEach(debugArea.getItems()::add);
+    }
+
+    private static void addDebug(Consumer<DebugState> consumer, Object variableValue, String scopeName, String variableNameUpperCase) {
+        switch (variableValue) {
+            case Object[][] multiObjects ->
+                    addMultiArrayDebug(scopeName, variableNameUpperCase, consumer, multiObjects);
+            case Object[] objects -> addArrayDebug(scopeName, variableNameUpperCase, consumer, objects);
+            case Object _ -> addObjectDebug(scopeName, variableNameUpperCase, consumer, variableValue);
+        }
     }
 
     private void highlightCurrentLine(int lineNumber) {
@@ -222,7 +226,7 @@ public class Main extends Application {
             case Integer _, Double _ ->
                     consumer.accept(new DebugState(scope, variableName, visualgType, variableValue.toString()));
             case UserDefinedValue userDefinedValue -> {
-                userDefinedValue.values().forEach((fieldName, fieldValue) -> addObjectDebug(scope, variableName + "." + fieldName, consumer, fieldValue));
+                userDefinedValue.values().forEach((fieldName, fieldValue) -> addDebug(consumer, fieldValue, scope, variableName + "." + fieldName));
             }
             default -> {
             }
