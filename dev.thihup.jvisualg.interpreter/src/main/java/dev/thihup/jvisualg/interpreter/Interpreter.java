@@ -1051,26 +1051,11 @@ public class Interpreter {
                         .mapToInt(node -> (Integer) evaluate(node.end()) + 2)
                         .toArray();
 
-
-
                 Object o = Array.newInstance(typeClass, dimensions);
                 switch (o) {
-                    case String[] stringArray -> Arrays.fill(stringArray, newInstance(type));
-                    case Integer[] intArray -> Arrays.fill(intArray, newInstance(type));
-                    case Double[] doubleArray -> Arrays.fill(doubleArray, newInstance(type));
-                    case Boolean[] booleanArray -> Arrays.fill(booleanArray, newInstance(type));
-                    case UserDefinedValue[] userDefinedArray -> Arrays.setAll(userDefinedArray, _ -> newInstance(type));
-
-                    case String[][] stringArray ->
-                            Arrays.stream(stringArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case Integer[][] intArray ->
-                            Arrays.stream(intArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case Double[][] doubleArray ->
-                            Arrays.stream(doubleArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case Boolean[][] booleanArray ->
-                            Arrays.stream(booleanArray).forEach(x -> Arrays.fill(x, newInstance(type)));
-                    case UserDefinedValue[][] userDefinedArray ->
-                            Arrays.stream(userDefinedArray).forEach(x -> Arrays.setAll(x, _ -> newInstance(type)));
+                    case Object[][] multiArray ->
+                            Arrays.stream(multiArray).forEach(x -> Arrays.setAll(x, _ -> newInstance(type)));
+                    case Object[] array -> Arrays.setAll(array, _ -> newInstance(type));
                     default -> throw new UnsupportedOperationException("Unexpected value: " + o);
                 }
                 yield o;
