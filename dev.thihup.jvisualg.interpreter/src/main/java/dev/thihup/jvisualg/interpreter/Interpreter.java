@@ -5,6 +5,8 @@ import dev.thihup.jvisualg.frontend.VisualgParser;
 import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
 import dev.thihup.jvisualg.interpreter.TypeException.InvalidOperand.Operator;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
@@ -18,34 +20,73 @@ import java.util.function.Consumer;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 
+@NullMarked
 public class Interpreter {
 
     public final SequencedMap<String, Map<String, Object>> stack = new LinkedHashMap<>();
     private final Map<String, Node.FunctionDeclarationNode> functions = new LinkedHashMap<>();
     private final Map<String, Node.ProcedureDeclarationNode> procedures = new LinkedHashMap<>();
     private final Map<String, UserDefinedType> userDefinedTypeMap = new LinkedHashMap<>();
-    private final RandomGenerator random = RandomGenerator.getDefault();
+    private static final RandomGenerator random = RandomGenerator.getDefault();
     private final IO io;
+    @Nullable
     private final Consumer<ProgramState> debuggerCallback;
 
     private AleatorioState aleatorio = AleatorioState.Off.INSTANCE;
     private boolean eco = false;
     private List<Integer> breakpoints = new ArrayList<>();
 
-    public enum State {
-        STOPPED,
-        RUNNING,
-        PAUSED_DEBUG,
-        COMPLETED_SUCCESSFULLY,
-        COMPLETED_EXCEPTIONALLY,
-        FORCED_STOP
+    public sealed interface State {
+        enum NotStarted implements State {INSTANCE}
+
+        enum Running implements State {INSTANCE}
+
+        record PausedDebug(int lineNumber) implements State {
+        }
+
+        enum CompletedSuccessfully implements State {INSTANCE}
+
+        record CompletedExceptionally(Throwable throwable) implements State {
+        }
+
+        enum ForcedStop implements State {INSTANCE}
     }
-    private volatile State state = State.STOPPED;
+    private volatile State state = State.NotStarted.INSTANCE;
 
     private sealed interface AleatorioState {
-        record Range(int start, int end, int decimalPlaces) implements AleatorioState {}
-        record Off() implements AleatorioState {
-            static final Off INSTANCE = new Off();
+
+        default InputValue generateValue(InputRequestValue requestValue) {
+            throw new UnsupportedOperationException();
+        }
+
+        record Range(int start, int end, int decimalPlaces) implements AleatorioState {
+            @Override
+            public InputValue generateValue(InputRequestValue requestValue) {
+                return switch (requestValue.type()) {
+                    case CARACTER -> new InputValue.CaracterValue(random.ints(65, 91)
+                            .limit(5)
+                            .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
+                    case LOGICO -> new InputValue.LogicoValue(random.nextBoolean());
+                    case REAL -> new InputValue.RealValue(generateRandomDouble(this));
+                    case INTEIRO -> new InputValue.InteiroValue(random.nextInt(start, end));
+                };
+
+            }
+
+            private double generateRandomDouble(AleatorioState.Range range) {
+                double v = random.nextDouble(range.start(), range.end());
+
+                if (range.decimalPlaces == 0) {
+                    return (int) v;
+                }
+                BigDecimal bd = new BigDecimal(v);
+                bd = bd.setScale(range.decimalPlaces, RoundingMode.HALF_UP);
+                return bd.doubleValue();
+
+            }
+        }
+        enum Off implements AleatorioState {
+            INSTANCE
         }
     }
 
@@ -53,7 +94,7 @@ public class Interpreter {
     public record ProgramState(int lineNumber, Map<String, Map<String, Object>> stack) {
     }
 
-    public Interpreter(IO io, Consumer<ProgramState> debuggerCallback) {
+    public Interpreter(IO io, @Nullable Consumer<ProgramState> debuggerCallback) {
         this.io = io;
         this.debuggerCallback = debuggerCallback;
     }
@@ -72,7 +113,7 @@ public class Interpreter {
         procedures.clear();
         stack.clear();
         breakpoints.clear();
-        state = State.STOPPED;
+        state = State.NotStarted.INSTANCE;
     }
 
     public State state() {
@@ -81,7 +122,7 @@ public class Interpreter {
 
     public CompletableFuture<Void> run(String code, ExecutorService executorService) {
         return CompletableFuture.runAsync(() -> {
-            state = State.RUNNING;
+            state = State.Running.INSTANCE;
             ASTResult parse = VisualgParser.parse(code);
                 parse.node()
                     .ifPresentOrElse(this::run, () -> {
@@ -92,23 +133,28 @@ public class Interpreter {
             if (debuggerCallback != null) {
                 debuggerCallback.accept(new ProgramState(0, stack));
             }
-            state = exception != null ? State.COMPLETED_SUCCESSFULLY : State.COMPLETED_EXCEPTIONALLY;
+            state = exception != null ? new State.CompletedExceptionally(exception) : State.CompletedSuccessfully.INSTANCE;
         });
     }
 
     private void run(Node node) {
         try {
             switch (state) {
-                case FORCED_STOP -> throw new CancellationException("Program was cancelled");
-                case COMPLETED_SUCCESSFULLY -> {
+                case State.ForcedStop _ -> throw new CancellationException("Program was cancelled");
+                case State.CompletedSuccessfully _ -> {
                     return;
                 }
-                case PAUSED_DEBUG -> handleDebugCommand(node);
+                case State.PausedDebug _ -> handleDebugCommand(node);
+
+                case State.CompletedExceptionally _, State.Running _, State.NotStarted _ -> {
+                }
+
             }
 
-            if (state != State.PAUSED_DEBUG && breakpoints.contains(node.location().orElse(Location.EMPTY).startLine()) &&
+            int lineNumber = node.location().orElse(Location.EMPTY).startLine();
+            if (!(state instanceof State.PausedDebug) && breakpoints.contains(lineNumber) &&
                 !(node instanceof Node.CompundNode<?>)) {
-                state = State.PAUSED_DEBUG;
+                state = new State.PausedDebug(lineNumber);
                 handleDebugCommand(node);
             }
 
@@ -121,10 +167,10 @@ public class Interpreter {
                 case Node.TypeNode _ -> throw new UnsupportedOperationException("TypeNode not implemented");
                 case Node.ExpressionNode e -> evaluate(e);
             }
-        } catch (IOException | InterruptedException | BrokenBarrierException _) {
-            state = State.COMPLETED_EXCEPTIONALLY;
+        } catch (IOException | InterruptedException | BrokenBarrierException e) {
+            state = new State.CompletedExceptionally(e);
         } catch (StopExecutionException _) {
-            state = State.COMPLETED_SUCCESSFULLY;
+            state = State.CompletedSuccessfully.INSTANCE;
         }
     }
 
@@ -133,7 +179,7 @@ public class Interpreter {
     }
 
     public void stop() {
-        state = State.FORCED_STOP;
+        state = State.ForcedStop.INSTANCE;
     }
 
     private void runDeclaration(Node.DeclarationNode declarationNode) {
@@ -158,11 +204,11 @@ public class Interpreter {
 
     public void step() {
         try {
-            if (state == State.PAUSED_DEBUG) {
+            if (state instanceof State.PausedDebug) {
                 if (lock.getNumberWaiting() == 1) {
                     lock.await();
                 }
-                state = State.PAUSED_DEBUG;
+//                state = State.PAUSED_DEBUG;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
@@ -171,11 +217,11 @@ public class Interpreter {
 
     public void continueExecution() {
         try {
-            if (state == State.PAUSED_DEBUG) {
+            if (state instanceof State.PausedDebug) {
                 if (lock.getNumberWaiting() == 1) {
                     lock.await();
                 }
-                state = State.RUNNING;
+                state = State.Running.INSTANCE;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
@@ -242,11 +288,9 @@ public class Interpreter {
             case Node.EcoCommandNode ecoCommandNode -> eco = ecoCommandNode.on();
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
             case Node.InterrompaCommandNode _ -> throw new BreakException();
-            case Node.LimpatelaCommandNode _ -> {
-                io.output().accept(new OutputEvent.Clear());
-            }
+            case Node.LimpatelaCommandNode _ -> io.output().accept(new OutputEvent.Clear());
             case Node.PausaCommandNode _ -> {
-                state = State.PAUSED_DEBUG;
+                state = new State.PausedDebug(commandNode.location().orElse(Location.EMPTY).startLine());
                 handleDebugCommand(commandNode);
             }
             case Node.ProcedureCallNode procedureCallNode -> {
@@ -292,7 +336,7 @@ public class Interpreter {
 
     private void runDebugCommand(Node.DebugCommandNode debugCommandNode) throws BrokenBarrierException, InterruptedException {
         if (evaluate(debugCommandNode.expr())) {
-            state = State.PAUSED_DEBUG;
+            state = new State.PausedDebug(debugCommandNode.location().orElse(Location.EMPTY).startLine());
             handleDebugCommand(debugCommandNode);
         }
     }
@@ -399,13 +443,12 @@ public class Interpreter {
     }
 
     private void runReadCommand(Node.ReadCommandNode readCommandNode) {
-        boolean aleatorioEnabled = aleatorio != AleatorioState.Off.INSTANCE;
         readCommandNode.exprList().nodes().forEach(expr -> {
             switch (expr) {
                 case Node.IdNode idNode -> {
                     Object o = evaluateVariableOrFunction(idNode);
                     InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass()));
-                    Object value = readValue(inputRequest, o, aleatorioEnabled);
+                    Object value = readValue(inputRequest, o);
                     assignVariable(idNode.id(), value, AssignContext.SIMPLE);
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
@@ -413,19 +456,17 @@ public class Interpreter {
                     Object o = evaluateVariableOrFunction(node);
 
                     Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
-                    switch(indexes.nodes().size()) {
-                        case 1 -> {
-                            int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
-                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType()));
-                            InputValue inputValue = aleatorioEnabled ? null : io.input().apply(inputRequest).join();
-                            Array.set(o, index, readValueForArray(o, inputRequest, inputValue));
-                        }
-                        case 2 -> {
+                    switch(o) {
+                        case Object[][] multiarray -> {
                             int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                             int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
                             InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType()));
-                            InputValue inputValue = aleatorioEnabled ? null : io.input().apply(inputRequest).join();
-                            Array.set(Array.get(o, index1), index2, readValueForArray(Array.get(o, index1), inputRequest, inputValue));
+                            multiarray[index1][index2] = readValue(inputRequest, multiarray[index1][index2]);
+                        }
+                        case Object[] array -> {
+                            int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType()));
+                            array[index] = readValue(inputRequest, array[index]);
                         }
                         default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
                     }
@@ -445,7 +486,7 @@ public class Interpreter {
                     }
                     Class<?> type = getType(typeNode);
                     InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(type));
-                    Object value = readValue(inputRequest, userDefinedValue.values().get(idNode.id()), aleatorioEnabled);
+                    Object value = readValue(inputRequest, userDefinedValue.values().get(idNode.id()));
                     userDefinedValue.values().put(idNode.id(), value);
                 }
                 default -> throw unsupportedType(expr);
@@ -454,21 +495,14 @@ public class Interpreter {
 
     }
 
-    private Object readValue(InputRequestValue inputRequest, Object o, boolean aleatorioEnabled) {
-        InputValue inputValue = aleatorioEnabled ? null : io.input().apply(inputRequest).join();
+    private Object readValue(InputRequestValue inputRequest, Object o) {
+        boolean aleatorioEnabled = aleatorio != AleatorioState.Off.INSTANCE;
+        InputValue inputValue = aleatorioEnabled ? aleatorio.generateValue(inputRequest) : io.input().apply(inputRequest).join();
         Object value = switch (o) {
-            case Boolean _ when aleatorioEnabled -> random.nextBoolean();
-            case String _ when aleatorioEnabled -> random.ints(65, 91)
-                    .limit(5)
-                    .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
-            case Double _ when aleatorio instanceof AleatorioState.Range range -> generateRandomDouble(range);
-            case Integer _ when aleatorio instanceof AleatorioState.Range(var start, var end, _) -> random.nextInt(start, end);
-
             case Integer _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
             case Double _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
             case String _ when inputValue instanceof InputValue.CaracterValue(var value1) -> value1;
             case Boolean _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
-
             default -> throw new TypeException.MissingInput(inputRequest);
         };
         if (eco && aleatorioEnabled)
@@ -482,39 +516,6 @@ public class Interpreter {
             case Node.IdNode idNode -> idNode;
             default -> throw new UnsupportedOperationException("Unexpected value: " + arrayAccessNode);
         };
-    }
-
-    private Object readValueForArray(Object o, InputRequestValue inputRequest, InputValue inputValue) {
-        boolean aleatorioEnabled = aleatorio != AleatorioState.Off.INSTANCE;
-        Object o1 = switch (o) {
-            case Boolean[] _ when aleatorioEnabled -> random.nextBoolean();
-            case String[] _ when aleatorioEnabled -> random.ints(65, 91)
-                    .limit(5)
-                    .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append);
-            case Double[] _ when aleatorio instanceof AleatorioState.Range range -> generateRandomDouble(range);
-            case Integer[] _ when aleatorio instanceof AleatorioState.Range(var start, var end, _) -> random.nextInt(start, end);
-
-            case Integer[] _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
-            case Double[] _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
-            case String[] _ when inputValue instanceof InputValue.CaracterValue(var value1) -> value1;
-            case Boolean[] _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
-            default -> throw new TypeException.MissingInput(inputRequest);
-        };
-        if (eco && aleatorioEnabled)
-            io.output().accept(new OutputEvent.Text(o1.toString() + "\n"));
-        return o1;
-    }
-
-    private double generateRandomDouble(AleatorioState.Range range) {
-        double v = random.nextDouble(range.start(), range.end());
-
-        if (range.decimalPlaces == 0) {
-            return (int) v;
-        }
-        BigDecimal bd = new BigDecimal(v);
-        bd = bd.setScale(range.decimalPlaces, RoundingMode.HALF_UP);
-        return bd.doubleValue();
-
     }
 
     private Object evaluateVariableOrFunction(Node.IdNode idNode) {
@@ -679,7 +680,7 @@ public class Interpreter {
     private Object evaluateFunction(Node.FunctionCallNode functionCallNode) {
         Node.FunctionDeclarationNode functionDeclaration = functions.get(functionCallNode.name().id());
         if (functionDeclaration != null) {
-            return callSubprogram(functionCallNode, functionDeclaration);
+            return Objects.requireNonNull(callSubprogram(functionCallNode, functionDeclaration));
         } else if (StandardFunctions.FUNCTIONS.containsKey(functionCallNode.name().id())) {
             MethodHandle methodHandle = StandardFunctions.FUNCTIONS.get(functionCallNode.name().id());
             List<Object> list = functionCallNode.args().nodes().stream().map(this::evaluate).toList();
@@ -696,6 +697,7 @@ public class Interpreter {
         }
     }
 
+    @Nullable
     private Object callSubprogram(Node.SubprogramCallNode subprogramCall, Node.SubprogramDeclarationNode subprogramDeclaration) {
         HashMap<String, Object> localVariables = new HashMap<>();
         String stackId = subprogramCall.name().id() + UUID.randomUUID();
@@ -770,7 +772,7 @@ public class Interpreter {
 
                     case PairValue(Number x, Number y) -> x.intValue() + y.intValue();
                     case PairValue(String x, String y) -> x + y;
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.ADD, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.ADD, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.DivNode(Node.ExpressionNode left, Node.ExpressionNode right, boolean integerResult, _) -> {
@@ -782,7 +784,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x / y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() / y.intValue();
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.DIVIDE, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.DIVIDE, leftResult.getClass(), rightResult.getClass());
                 };
                 yield integerResult ? result.intValue() : result;
             }
@@ -795,7 +797,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x % y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() % y.intValue();
-                    case Object o ->
+                    case Object _ ->
                             throw new TypeException.InvalidOperand(Operator.MODULO, leftResult.getClass(), rightResult.getClass());
                 };
             }
@@ -808,7 +810,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x * y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() * y.intValue();
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.MULTIPLY, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.MULTIPLY, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -821,7 +823,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> Math.pow(x, y.doubleValue());
 
                     case PairValue(Number x, Number y) -> (int) Math.pow(x.intValue(), y.intValue());
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.POW, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.POW, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.SubNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -833,7 +835,7 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x - y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() - y.intValue();
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.SUBTRACT, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.SUBTRACT, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.RelationalNode relationalNode -> evaluateRelationalNode(relationalNode);
@@ -848,7 +850,7 @@ public class Interpreter {
 
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean x, Boolean y) -> x && y;
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.AND, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.AND, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.OrNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -857,7 +859,7 @@ public class Interpreter {
 
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean x, Boolean y) -> x || y;
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.OR, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.OR, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -874,7 +876,7 @@ public class Interpreter {
 
                     case PairValue(Number x, Number y) -> x.intValue() >= y.intValue();
                     case PairValue(String x, String y) -> x.compareToIgnoreCase(y) >= 0;
-                    case Object o ->
+                    case Object _ ->
                             throw new TypeException.InvalidOperand(Operator.GREATER_THAN_OR_EQUALS, leftResult.getClass(), rightResult.getClass());
                 };
             }
@@ -890,7 +892,7 @@ public class Interpreter {
                     case PairValue(Boolean _, Number y) -> y;
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(String x, String y) -> x.compareToIgnoreCase(y) > 0;
-                    case Object o ->
+                    case Object _ ->
                             throw new TypeException.InvalidOperand(Operator.GREATER_THAN, leftResult.getClass(), rightResult.getClass());
                 };
             }
@@ -906,7 +908,7 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(Number x, Number y) -> x.intValue() <= y.intValue();
                     case PairValue(String x, String y) -> x.compareToIgnoreCase(y) <= 0;
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.LESS_THAN_OR_EQUALS, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.LESS_THAN_OR_EQUALS, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.LtNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -923,7 +925,7 @@ public class Interpreter {
 
                     case PairValue(Number x, Number y) -> x.intValue() < y.intValue();
                     case PairValue(String x, String y) -> x.compareToIgnoreCase(y) < 0;
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.LESS_THAN, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.LESS_THAN, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -936,7 +938,7 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(String x, String y) -> x.equalsIgnoreCase(y);
                     case PairValue(Object x, Object y) -> x.equals(y);
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.EQUALS, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.EQUALS, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -949,7 +951,7 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(String x, String y) -> !x.equalsIgnoreCase(y);
                     case PairValue(Object x, Object y) -> !x.equals(y);
-                    case Object o -> throw new TypeException.InvalidOperand(Operator.NOT_EQUALS, leftResult.getClass(), rightResult.getClass());
+                    case Object _ -> throw new TypeException.InvalidOperand(Operator.NOT_EQUALS, leftResult.getClass(), rightResult.getClass());
                 };
             }
         };

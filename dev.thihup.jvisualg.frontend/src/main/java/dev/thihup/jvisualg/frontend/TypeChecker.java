@@ -2,6 +2,7 @@ package dev.thihup.jvisualg.frontend;
 
 import dev.thihup.jvisualg.frontend.node.Location;
 import dev.thihup.jvisualg.frontend.node.Node;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.util.*;
 import java.util.function.Function;
@@ -10,6 +11,7 @@ import java.util.stream.Stream;
 
 import static dev.thihup.jvisualg.frontend.TypeChecker.Type.PrimitiveTypes.*;
 
+@NullUnmarked
 public class TypeChecker {
 
     public static final Scope DEFAULT_GLOBAL_SCOPE = new Scope("DEFAULT", Map.of(), Map.of(),
@@ -221,7 +223,6 @@ public class TypeChecker {
             errors.add(new Error("Procedure " + procedureDeclarationNode.name().id() + " already declared", procedureDeclarationNode.location().orElse(Location.EMPTY)));
         } else {
             SequencedMap<String, Declaration.Variable> parameters = procedureDeclarationNode.parameters().nodes().stream()
-                    .filter(Objects::nonNull)
                     .map(Node.VariableDeclarationNode.class::cast)
                     .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location().orElse(Location.EMPTY)))
                     .collect(Collectors.toMap(Declaration.Variable::name, x -> x, (a, _) -> a, LinkedHashMap::new));
@@ -241,7 +242,6 @@ public class TypeChecker {
         } else {
             Type returnType = getType(functionDeclarationNode.returnType(), scope, errors);
             SequencedMap<String, Declaration.Variable> parameters = functionDeclarationNode.parameters().nodes().stream()
-                    .filter(Objects::nonNull)
                     .map(Node.VariableDeclarationNode.class::cast)
                     .map(p -> new Declaration.Variable(p.name().id(), getType(p.type(), scope, errors), p.location().orElse(Location.EMPTY)))
                     .collect(Collectors.toMap(Declaration.Variable::name, x -> x, (a, _) -> a, LinkedHashMap::new));
@@ -760,10 +760,6 @@ public class TypeChecker {
 
             case Node.RangeNode(Node start, Node end, var location) -> {
                 Type startType = getType(start, scope, errors);
-
-                if (end == null) {
-                    yield startType;
-                }
                 Type endType = getType(end, scope, errors);
 
                 if (areTypesCompatible(startType, endType)) {

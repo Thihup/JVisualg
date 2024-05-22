@@ -1,5 +1,7 @@
 package dev.thihup.jvisualg.frontend.node;
 
+import org.jspecify.annotations.NullMarked;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -144,8 +146,7 @@ public sealed interface Node {
         };
         return childrenNode.mapMulti((Node element, Consumer<Node>  downstream) -> {
             downstream.accept(element);
-            if (element != null)
-                element.visitChildren().forEach(downstream);
+            element.visitChildren().forEach(downstream);
         });
     }
 

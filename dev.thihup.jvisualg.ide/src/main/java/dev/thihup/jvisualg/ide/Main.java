@@ -123,16 +123,18 @@ public class Main extends Application {
         runButton.addEventHandler(ActionEvent.ACTION, _ -> {
             Platform.runLater(() -> {
                 switch (interpreter.state()) {
-                    case RUNNING -> {
+                    case Interpreter.State.Running _ -> {
                     }
-                    case PAUSED_DEBUG -> interpreter.continueExecution();
-                    case STOPPED -> {
+                    case Interpreter.State.PausedDebug _ -> interpreter.continueExecution();
+                    case Interpreter.State.NotStarted _ -> {
                         resetExecution();
 
                         interpreter.run(codeArea.getText(), executor)
                                 .thenRun(this::handleExecutionSuccessfully)
                                 .exceptionally(this::handleExecutionError)
                                 .whenComplete((_, _) -> Platform.runLater(this::removeDebugStyleFromPreviousLine));
+                    }
+                    case Interpreter.State.CompletedExceptionally _, Interpreter.State.CompletedSuccessfully _, Interpreter.State.ForcedStop _ -> {
                     }
                 }
             });
@@ -413,20 +415,21 @@ public class Main extends Application {
                 case F9 -> runButton.fire();
                 case F8 -> {
                     switch (interpreter.state()) {
-                        case PAUSED_DEBUG -> {
+                        case Interpreter.State.PausedDebug _ -> {
                             interpreter.step();
                         }
-                        case STOPPED -> {
+                        case Interpreter.State.NotStarted _, Interpreter.State.ForcedStop _, Interpreter.State.CompletedExceptionally _, Interpreter.State.CompletedSuccessfully _ -> {
                             breakpointLines.addLast(1);
                             runButton.fire();
                         }
-                        case RUNNING -> {
+                        case Interpreter.State.Running _ -> {
                         }
                     }
                 }
                 case ESCAPE -> {
                     switch (interpreter.state()) {
-                        case STOPPED, COMPLETED_EXCEPTIONALLY, COMPLETED_SUCCESSFULLY -> dosWindow.hide();
+                        case Interpreter.State.ForcedStop _, Interpreter.State.CompletedExceptionally _, Interpreter.State.CompletedSuccessfully _ -> dosWindow.hide();
+                        case Interpreter.State.PausedDebug _, Interpreter.State.NotStarted _, Interpreter.State.Running _ -> {}
                     }
                 }
                 default -> {

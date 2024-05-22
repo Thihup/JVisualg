@@ -7,6 +7,7 @@ import dev.thihup.jvisualg.frontend.node.Node;
 import dev.thihup.jvisualg.frontend.node.Node.*;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.util.*;
 import java.util.function.Consumer;
