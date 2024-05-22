@@ -400,6 +400,9 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         if (ctx.parenExpression() instanceof VisuAlgParser.ParenExpressionContext parenExpressionContext) {
             return visitExpr(parenExpressionContext.expr());
         }
+        if (ctx.ADD() != null && ctx.expr().size() == 1) {
+            return new PosNode(visitExpr(ctx.expr(0)), fromRuleContext(ctx));
+        }
         if (ctx.SUB() != null && ctx.expr().size() == 1) {
             return new NegNode(visitExpr(ctx.expr(0)), fromRuleContext(ctx));
         }

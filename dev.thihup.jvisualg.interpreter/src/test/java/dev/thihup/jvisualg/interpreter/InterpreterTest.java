@@ -11,11 +11,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
+import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 class InterpreterTest extends ExamplesBase {
     @Test
@@ -492,5 +494,49 @@ class InterpreterTest extends ExamplesBase {
         interpreter.run(Files.readString(path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor()).get(10, TimeUnit.SECONDS);
 
         System.out.println(stringBuilder);
+    }
+
+    record FileAndError(Path path, Class<? extends Exception> e){}
+
+    private static Stream<FileAndError> exampleErrorsWithType() throws Throwable {
+        return Stream.of(
+            ExamplesBase.examples("errors/assignment").map(x -> new FileAndError(x, TypeException.InvalidAssignment.class)),
+            ExamplesBase.examples("errors/invalidOperand").map(x -> new FileAndError(x, TypeException.InvalidOperand.class)),
+            ExamplesBase.examples("errors/unsupported").map(x -> new FileAndError(x, UnsupportedOperationException.class)),
+            ExamplesBase.examples("errors/wrongArguments").map(x -> new FileAndError(x, TypeException.WrongNumberOfArguments.class)),
+            ExamplesBase.examples("errors/notfound/function").map(x -> new FileAndError(x, TypeException.FunctionNotFound.class)),
+            ExamplesBase.examples("errors/notfound/variable").map(x -> new FileAndError(x, TypeException.VariableNotFound.class)),
+            ExamplesBase.examples("errors/notfound/procedure").map(x -> new FileAndError(x, TypeException.ProcedureNotFound.class)),
+            ExamplesBase.examples("errors/notfound/type").map(x -> new FileAndError(x, TypeException.TypeNotFound.class)),
+            ExamplesBase.examples("errors/index").map(x -> new FileAndError(x, TypeException.IndexOutOfBounds.class))
+        ).flatMap(s -> s);
+    }
+
+    @ParameterizedTest
+    @MethodSource("exampleErrorsWithType")
+    void testExamplesErrors(FileAndError file) throws Throwable {
+        RandomGenerator aDefault = RandomGenerator.getDefault();
+        StringBuilder stringBuilder = new StringBuilder();
+        IO io = new IO(
+            _ -> CompletableFuture.completedFuture(Optional.empty()),
+            a -> {
+                switch (a) {
+                    case OutputEvent.Text(String t) -> stringBuilder.append(t);
+                    default -> {
+                    }
+                }
+        });
+
+        Interpreter interpreter = new Interpreter(io);
+
+        CompletableFuture<Void> run = interpreter.run(Files.readString(file.path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor());
+        try {
+            run.join();
+            fail();
+        } catch (CompletionException e) {
+            System.out.println(stringBuilder);
+            assertInstanceOf(file.e, e.getCause());
+        }
+
     }
 }

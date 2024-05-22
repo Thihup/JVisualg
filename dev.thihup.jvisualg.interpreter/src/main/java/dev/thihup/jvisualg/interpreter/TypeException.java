@@ -42,9 +42,10 @@ public sealed class TypeException extends RuntimeException {
         }
     }
 
-    public static final class InvalidIndex extends TypeException {
-        public InvalidIndex(int index) {
-            super("Unsupported number of indexes: " + index);
+    public static final class IndexOutOfBounds extends TypeException {
+        public IndexOutOfBounds(IndexOutOfBoundsException e) {
+            super(e.getMessage());
+            initCause(e);
         }
     }
 

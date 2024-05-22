@@ -10,6 +10,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Array;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -31,6 +32,7 @@ public class Interpreter {
     private final Consumer<ProgramState> debuggerCallback;
     private final List<Integer> breakpoints = new ArrayList<>();
     private final InputState.ReadInput inputFromIO;
+    private final CyclicBarrier lock = new CyclicBarrier(2);
 
     private volatile InterpreterState state = InterpreterState.NotStarted.INSTANCE;
     private InputState inputState;
@@ -116,6 +118,8 @@ public class Interpreter {
             state = new InterpreterState.CompletedExceptionally(e);
         } catch (StopExecutionException _) {
             state = InterpreterState.CompletedSuccessfully.INSTANCE;
+        } catch (IndexOutOfBoundsException e) {
+            throw new TypeException.IndexOutOfBounds(e);
         }
     }
 
@@ -147,8 +151,6 @@ public class Interpreter {
 
         userDefinedTypeMap.put(name.id(), new UserDefinedType(name.id(), fields));
     }
-
-    CyclicBarrier lock = new CyclicBarrier(2);
 
     public void step() {
         try {
@@ -210,35 +212,10 @@ public class Interpreter {
             case Node.ForCommandNode forCommandNode -> runForCommand(forCommandNode);
             case Node.InterrompaCommandNode _ -> throw new BreakException();
             case Node.LimpatelaCommandNode _ -> io.output().accept(new OutputEvent.Clear());
-            case Node.PausaCommandNode _ -> {
-                state = new InterpreterState.PausedDebug(commandNode.location().orElse(Location.EMPTY).startLine());
-                handleDebugCommand(commandNode);
-            }
-            case Node.ProcedureCallNode procedureCallNode -> {
-                Node.ProcedureDeclarationNode procedureDeclaration = procedures.get(procedureCallNode.name().id());
-                if (procedureDeclaration != null) {
-                    callSubprogram(procedureCallNode, procedureDeclaration);
-                } else if (procedureCallNode.name().id().equals("mudacor")) {
-                    if (procedureCallNode.args().nodes().size() != 2) {
-                        throw new TypeException.WrongNumberOfArguments(2, procedureCallNode.args().nodes().size());
-                    }
-                    try {
-                        OutputEvent.ChangeColor.Color color = OutputEvent.ChangeColor.Color.fromString(evaluate(procedureCallNode.args().nodes().getFirst()));
-                        OutputEvent.ChangeColor.Position position = OutputEvent.ChangeColor.Position.fromString(evaluate(procedureCallNode.args().nodes().getLast()));
-                        io.output().accept(new OutputEvent.ChangeColor(color, position));
-                    } catch (IllegalArgumentException _) {
-
-                    }
-                } else {
-                    throw new TypeException.ProcedureNotFound(procedureCallNode.name().id());
-                }
-
-            }
+            case Node.PausaCommandNode _ -> runPausaCommand(commandNode.location(), commandNode);
+            case Node.ProcedureCallNode procedureCallNode -> runProcedureCall(procedureCallNode);
             case Node.ReadCommandNode readCommandNode -> runReadCommand(readCommandNode);
-            case Node.ReturnNode returnNode -> {
-                stack.lastEntry().getValue().put("(RESULTADO)", evaluate(returnNode.expr()));
-                throw new ReturnException();
-            }
+            case Node.ReturnNode returnNode -> runReturnNode(returnNode);
             case Node.TimerCommandNode _ -> {
             }
             case Node.WhileCommandNode whileCommandNode -> runWhileCommand(whileCommandNode);
@@ -248,14 +225,54 @@ public class Interpreter {
         }
     }
 
+    private void runPausaCommand(Optional<Location> commandNode, Node.CommandNode commandNode1) throws BrokenBarrierException, InterruptedException {
+        state = new InterpreterState.PausedDebug(commandNode.orElse(Location.EMPTY).startLine());
+        handleDebugCommand(commandNode1);
+    }
+
+    private void runReturnNode(Node.ReturnNode returnNode) {
+        stack.lastEntry().getValue().put("(RESULTADO)", evaluate(returnNode.expr()));
+        throw new ReturnException();
+    }
+
+    private void runProcedureCall(Node.ProcedureCallNode procedureCallNode) {
+        Node.ProcedureDeclarationNode procedureDeclaration = procedures.get(procedureCallNode.name().id());
+        if (procedureDeclaration != null) {
+            callSubprogram(procedureCallNode, procedureDeclaration);
+        } else if (procedureCallNode.name().id().equals("mudacor")) {
+            mudaCorProcedure(procedureCallNode);
+        } else {
+            throw new TypeException.ProcedureNotFound(procedureCallNode.name().id());
+        }
+    }
+
+    private void mudaCorProcedure(Node.ProcedureCallNode procedureCallNode) {
+        if (procedureCallNode.args().nodes().size() != 2) {
+            throw new TypeException.WrongNumberOfArguments(2, procedureCallNode.args().nodes().size());
+        }
+        try {
+            OutputEvent.ChangeColor.Color color = OutputEvent.ChangeColor.Color.fromString(evaluate(procedureCallNode.args().nodes().getFirst()));
+            OutputEvent.ChangeColor.Position position = OutputEvent.ChangeColor.Position.fromString(evaluate(procedureCallNode.args().nodes().getLast()));
+            io.output().accept(new OutputEvent.ChangeColor(color, position));
+        } catch (IllegalArgumentException _) {
+
+        }
+    }
+
     private void runChooseCommand(Node.ChooseCommandNode chooseCommandNode) {
         Node.ExpressionNode test = chooseCommandNode.expr();
         for (Node.ChooseCaseNode chooseCaseNode : chooseCommandNode.cases().nodes()) {
             for (Node.ExpressionNode values : chooseCaseNode.value().nodes()) {
                 switch (values) {
                     case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
-                        int value = ((Number) evaluate(test)).intValue();
-                        if (value >= ((Number) evaluate(start)).intValue() && value <= ((Number) evaluate(end)).intValue()) {
+
+                        Node.AndNode andNode = new Node.AndNode(
+                                new Node.GeNode(test, start, Optional.empty()),
+                                new Node.LeNode(test, end, Optional.empty()),
+                                Optional.empty()
+                        );
+
+                        if (evaluate(andNode)) {
                             run(chooseCaseNode.commands());
                             return;
                         }
@@ -269,8 +286,7 @@ public class Interpreter {
                 }
             }
         }
-        Node.ChooseCaseNode caseNode = Objects.requireNonNull(chooseCommandNode.defaultCase());
-        run(caseNode.commands());
+        run(chooseCommandNode.defaultCase().commands());
     }
 
     private void runArquivoCommand(Node.ArquivoCommandNode arquivoCommandNode) {
@@ -285,15 +301,16 @@ public class Interpreter {
         switch (aleatorioNode) {
             case Node.AleatorioOffNode _ -> inputState = inputFromIO;
             case Node.AleatorioOnNode _ -> inputState = new InputState.Aleatorio(random, 0, 100, 0);
-            case Node.AleatorioRangeNode aleatorioRangeNode ->
-                    inputState = new InputState.Aleatorio(random, evaluate(aleatorioRangeNode.start()), evaluate(aleatorioRangeNode.end()), evaluate(aleatorioRangeNode.decimalPlaces()));
+            case Node.AleatorioRangeNode aleatorioRangeNode -> inputState = new InputState.Aleatorio(random,
+                    evaluate(aleatorioRangeNode.start()),
+                    evaluate(aleatorioRangeNode.end()),
+                    evaluate(aleatorioRangeNode.decimalPlaces()));
         }
     }
 
     private void runDebugCommand(Node.DebugCommandNode debugCommandNode) throws BrokenBarrierException, InterruptedException {
         if (evaluate(debugCommandNode.expr())) {
-            state = new InterpreterState.PausedDebug(debugCommandNode.location().orElse(Location.EMPTY).startLine());
-            handleDebugCommand(debugCommandNode);
+            runPausaCommand(debugCommandNode.location(), debugCommandNode);
         }
     }
 
@@ -316,7 +333,7 @@ public class Interpreter {
                         int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                         assignToArray(array, index, evaluate);
                     }
-                    default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
+                    default -> throw unsupportedType(o);
                 }
 
             }
@@ -398,56 +415,58 @@ public class Interpreter {
     }
 
     private void runReadCommand(Node.ReadCommandNode readCommandNode) {
-        readCommandNode.exprList().nodes().forEach(expr -> {
-            switch (expr) {
-                case Node.IdNode idNode -> {
-                    Object variable = evaluateVariableOrFunction(idNode);
-                    InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(variable.getClass()));
-                    Object value = readValue(inputRequest, variable);
-                    assignVariable(idNode.id(), value, AssignContext.SIMPLE);
-                }
-                case Node.ArrayAccessNode arrayAccessNode -> {
-                    Node.IdNode node = getIdentifierForArray(arrayAccessNode.node());
-                    Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
-                    Object variable = evaluateVariableOrFunction(node);
-                    final Class<?> componentType = variable.getClass().getComponentType();
-                    switch (variable) {
-                        case Object[][] multiarray -> {
-                            int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
-                            int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
-                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(componentType.getComponentType()));
-                            multiarray[index1][index2] = readValue(inputRequest, multiarray[index1][index2]);
-                        }
-                        case Object[] array -> {
-                            int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
-                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(componentType));
-                            array[index] = readValue(inputRequest, array[index]);
-                        }
-                        default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
-                    }
-                }
-                case Node.MemberAccessNode(Node.ExpressionNode node, Node member, _) -> {
-                    Object evaluate = evaluate(node);
-                    if (!(evaluate instanceof UserDefinedValue userDefinedValue)) {
-                        throw unsupportedType(evaluate);
-                    }
-                    if (!(member instanceof Node.IdNode idNode)) {
-                        throw unsupportedType(member);
-                    }
-                    UserDefinedType userDefinedType = userDefinedValue.type();
-                    Node.TypeNode typeNode = userDefinedType.fields().get(idNode.id());
-                    if (typeNode == null) {
-                        throw new TypeException.VariableNotFound(idNode.id());
-                    }
-                    Class<?> type = getType(typeNode);
-                    InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(type));
-                    Object value = readValue(inputRequest, userDefinedValue.values().get(idNode.id()));
-                    userDefinedValue.values().put(idNode.id(), value);
-                }
-                default -> throw unsupportedType(expr);
-            }
-        });
+        readCommandNode.exprList().nodes().forEach(this::readExpression);
+    }
 
+    private void readExpression(Node.ExpressionNode expr) {
+        switch (expr) {
+            case Node.IdNode idNode -> {
+                Object variable = evaluateVariableOrFunction(idNode);
+                InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(variable.getClass()));
+                Object value = readValue(inputRequest, variable);
+                assignVariable(idNode.id(), value, AssignContext.SIMPLE);
+            }
+            case Node.ArrayAccessNode arrayAccessNode -> {
+                Node.IdNode node = getIdentifierForArray(arrayAccessNode.node());
+                Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
+                Object variable = evaluateVariableOrFunction(node);
+                final Class<?> componentType = variable.getClass().getComponentType();
+
+                switch (variable) {
+                    case Object[][] multiarray -> {
+                        int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                        int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
+                        InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(componentType.getComponentType()));
+                        multiarray[index1][index2] = readValue(inputRequest, multiarray[index1][index2]);
+                    }
+                    case Object[] array -> {
+                        int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                        InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(componentType));
+                        array[index] = readValue(inputRequest, array[index]);
+                    }
+                    default -> throw unsupportedType(variable);
+                }
+            }
+            case Node.MemberAccessNode(Node.ExpressionNode node, Node member, _) -> {
+                Object evaluate = evaluate(node);
+                if (!(evaluate instanceof UserDefinedValue userDefinedValue)) {
+                    throw unsupportedType(evaluate);
+                }
+                if (!(member instanceof Node.IdNode idNode)) {
+                    throw unsupportedType(member);
+                }
+                UserDefinedType userDefinedType = userDefinedValue.type();
+                Node.TypeNode typeNode = userDefinedType.fields().get(idNode.id());
+                if (typeNode == null) {
+                    throw new TypeException.VariableNotFound(idNode.id());
+                }
+                Class<?> type = getType(typeNode);
+                InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(type));
+                Object value = readValue(inputRequest, userDefinedValue.values().get(idNode.id()));
+                userDefinedValue.values().put(idNode.id(), value);
+            }
+            default -> throw unsupportedType(expr);
+        }
     }
 
     private Object readValue(InputRequestValue inputRequest, Object o) {
@@ -622,17 +641,18 @@ public class Interpreter {
         Object o = evaluateVariableOrFunction(getIdentifierForArray(arrayAccessNode.node()));
 
         Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
-        switch (indexes.nodes().size()) {
-            case 1 -> {
-                int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
-                return Array.get(o, index);
-            }
-            case 2 -> {
+
+        switch (o) {
+            case Object[][] multiarray -> {
                 int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                 int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
-                return Array.get(Array.get(o, index1), index2);
+                return multiarray[index1][index2];
             }
-            default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
+            case Object[] array -> {
+                int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                return array[index];
+            }
+            default -> throw unsupportedType(o);
         }
     }
 
@@ -643,8 +663,16 @@ public class Interpreter {
         } else if (StandardFunctions.FUNCTIONS.containsKey(functionCallNode.name().id())) {
             MethodHandle methodHandle = StandardFunctions.FUNCTIONS.get(functionCallNode.name().id());
             List<Object> list = functionCallNode.args().nodes().stream().map(this::evaluate).toList();
-            if (methodHandle.type().parameterCount() != list.size()) {
-                throw new TypeException.WrongNumberOfArguments(methodHandle.type().parameterCount(), list.size());
+            MethodType type = methodHandle.type().wrap();
+            if (type.parameterCount() != list.size()) {
+                throw new TypeException.WrongNumberOfArguments(type.parameterCount(), list.size());
+            }
+            for (int i = 0; i < type.parameterCount(); i++) {
+                Class<?> variableClass = type.parameterType(i);
+                if (variableClass == Number.class) {
+                    variableClass = Double.class;
+                }
+                assignArgument(list.get(i), variableClass);
             }
             try {
                 return methodHandle.invokeWithArguments(list);
@@ -786,7 +814,7 @@ public class Interpreter {
                     case PairValue(Number x, Double y) -> Math.pow(x.doubleValue(), y);
                     case PairValue(Double x, Number y) -> Math.pow(x, y.doubleValue());
 
-                    case PairValue(Number x, Number y) -> (int) Math.pow(x.intValue(), y.intValue());
+                    case PairValue(Number x, Number y) -> Math.pow(x.intValue(), y.intValue());
                     case Object _ ->
                             throw new TypeException.InvalidOperand(Operator.POW, leftResult.getClass(), rightResult.getClass());
                 };
@@ -946,37 +974,39 @@ public class Interpreter {
 
     private void assignVariable(String name, Object value, AssignContext context) {
         stack.reversed().values().stream().filter(m -> m.containsKey(name)).findFirst().ifPresentOrElse(m -> {
-            Object valueToAssign = value;
-            switch (context) {
-                case ARGUMENT -> {
-                    Class<?> variableClass = m.get(name).getClass();
-                    Class<?> valueClass = value.getClass();
-                    if (valueClass != variableClass) {
-                        if (variableClass == Integer.class && valueClass == Double.class) {
-                            valueToAssign = ((Number) value).intValue();
-                        } else if (variableClass == Double.class && valueClass == Integer.class) {
-                            valueToAssign = ((Number) value).doubleValue();
-                        } else {
-                            throw new TypeException.InvalidAssignment(variableClass, valueClass);
-                        }
-                    }
-                }
-                case SIMPLE -> {
-                    Class<?> variableClass = m.get(name).getClass();
-                    Class<?> valueClass = value.getClass();
-                    if (variableClass != valueClass) {
-                        if (variableClass == Double.class && valueClass == Integer.class) {
-                            valueToAssign = ((Number) value).doubleValue();
-                        } else {
-                            throw new TypeException.InvalidAssignment(variableClass, valueClass);
-                        }
-                    }
-                }
-            }
-            m.put(name, valueToAssign);
+            m.put(name, switch (context) {
+                case ARGUMENT -> assignArgument(value, m.get(name).getClass());
+                case SIMPLE ->  assignSimple(value, m.get(name).getClass());
+            });
         }, () -> {
             throw new TypeException.VariableNotFound(name);
         });
+    }
+
+    private static Object assignSimple(Object value, Class<?> variableClass) {
+        Class<?> valueClass = value.getClass();
+        if (variableClass != valueClass) {
+            if (variableClass == Double.class && valueClass == Integer.class) {
+                value = ((Number) value).doubleValue();
+            } else {
+                throw new TypeException.InvalidAssignment(variableClass, valueClass);
+            }
+        }
+        return value;
+    }
+
+    private static Object assignArgument(Object value, Class<?> variableClass) {
+        Class<?> valueClass = value.getClass();
+        if (valueClass != variableClass) {
+            if (variableClass == Integer.class && valueClass == Double.class) {
+                value = ((Number) value).intValue();
+            } else if (variableClass == Double.class && valueClass == Integer.class) {
+                value = ((Number) value).doubleValue();
+            } else {
+                throw new TypeException.InvalidAssignment(variableClass, valueClass);
+            }
+        }
+        return value;
     }
 
     private Class<?> getType(Node typeNode) {
@@ -993,7 +1023,7 @@ public class Interpreter {
                     yield UserDefinedValue.class;
                 }
             };
-            default -> throw new UnsupportedOperationException("Unexpected value: " + typeNode);
+            default -> throw unsupportedType(typeNode);
         };
     }
 
@@ -1028,7 +1058,7 @@ public class Interpreter {
                     case Object[][] multiArray ->
                             Arrays.stream(multiArray).forEach(x -> Arrays.setAll(x, _ -> newInstance(type)));
                     case Object[] array -> Arrays.setAll(array, _ -> newInstance(type));
-                    default -> throw new UnsupportedOperationException("Unexpected value: " + o);
+                    default -> throw unsupportedType(o);
                 }
                 yield o;
             }

@@ -10,17 +10,21 @@ import java.util.stream.Stream;
 
 public class ExamplesBase {
 
-    static Stream<Path> examplesV25() throws Throwable {
+    public static Stream<Path> examplesV25() throws Throwable {
         return examples("v25");
     }
 
-    static Stream<Path> examplesV30() throws Throwable {
+    public static Stream<Path> examplesV30() throws Throwable {
         return examples("v30");
     }
 
-    static Stream<Path> examplesCustom() throws Throwable {
+    public static Stream<Path> examplesCustom() throws Throwable {
         return examples("custom");
     }
+    public static Stream<Path> examplesErrors() throws Throwable {
+        return examples("errors");
+    }
+
 
     public static Stream<Path> examples(String folder) throws Throwable {
         URI start = ExamplesBase.class.getResource(folder).toURI();

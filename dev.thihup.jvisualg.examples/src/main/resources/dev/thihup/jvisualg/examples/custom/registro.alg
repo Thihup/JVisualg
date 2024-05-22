@@ -22,6 +22,26 @@ VAR
 
 inicio
 
+    aleatorio on
+
+    leia(A.x)
+    leia(B.x)
+    leia(C[0].x)
+    leia(D[0].x)
+
+    escreval(A.x)
+
+    escreval(B.x)
+
+    escreval(C[0].x)
+
+    escreval(D[0].x)
+
+    A.x <- 4
+    B.x <- 1
+    C[0].x <- 3
+    D[0].x <- 8
+
     escreval(A.x)
 
     escreval(B.x)
