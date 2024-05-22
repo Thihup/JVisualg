@@ -37,10 +37,9 @@ public class Interpreter {
     private boolean eco = false;
 
 
-
     public Interpreter(IO io, @Nullable Consumer<ProgramState> debuggerCallback) {
         this.io = io;
-        this.debuggerCallback = debuggerCallback == null ? x -> continueExecution() : debuggerCallback;
+        this.debuggerCallback = debuggerCallback == null ? _ -> continueExecution() : debuggerCallback;
         this.inputFromIO = new InputState.ReadInput(io);
         this.inputState = inputFromIO;
     }
@@ -70,7 +69,7 @@ public class Interpreter {
         return CompletableFuture.runAsync(() -> {
             state = InterpreterState.Running.INSTANCE;
             ASTResult parse = VisualgParser.parse(code);
-                parse.node()
+            parse.node()
                     .ifPresentOrElse(this::run, () -> {
                         throw new RuntimeException("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n")));
                     });
@@ -90,14 +89,15 @@ public class Interpreter {
                 }
                 case InterpreterState.PausedDebug _ -> handleDebugCommand(node);
 
-                case InterpreterState.CompletedExceptionally _, InterpreterState.Running _, InterpreterState.NotStarted _ -> {
+                case InterpreterState.CompletedExceptionally _, InterpreterState.Running _,
+                     InterpreterState.NotStarted _ -> {
                 }
 
             }
 
             int lineNumber = node.location().orElse(Location.EMPTY).startLine();
             if (!(state instanceof InterpreterState.PausedDebug) && breakpoints.contains(lineNumber) &&
-                !(node instanceof Node.CompundNode<?>)) {
+                    !(node instanceof Node.CompundNode<?>)) {
                 state = new InterpreterState.PausedDebug(lineNumber);
                 handleDebugCommand(node);
             }
@@ -106,7 +106,8 @@ public class Interpreter {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
                 case Node.CommandNode commandNode -> runCommand(commandNode);
                 case Node.CompundNode<?> compundNode -> runCompundNode(compundNode);
-                case Node.DosNode _, Node.EmptyNode _ -> {}
+                case Node.DosNode _, Node.EmptyNode _ -> {
+                }
                 case Node.DeclarationNode declarationNode -> runDeclaration(declarationNode);
                 case Node.TypeNode _ -> throw new UnsupportedOperationException("TypeNode not implemented");
                 case Node.ExpressionNode e -> evaluate(e);
@@ -129,9 +130,12 @@ public class Interpreter {
     private void runDeclaration(Node.DeclarationNode declarationNode) {
         switch (declarationNode) {
             case Node.ConstantNode constantNode -> runConstant(constantNode);
-            case Node.RegistroDeclarationNode registroDeclarationNode -> runRegistroDeclaration(registroDeclarationNode);
-            case Node.SubprogramDeclarationNode subprogramDeclarationNode -> runSubprogramDeclaration(subprogramDeclarationNode);
-            case Node.VariableDeclarationNode variableDeclarationNode -> runVariableDeclaration(variableDeclarationNode);
+            case Node.RegistroDeclarationNode registroDeclarationNode ->
+                    runRegistroDeclaration(registroDeclarationNode);
+            case Node.SubprogramDeclarationNode subprogramDeclarationNode ->
+                    runSubprogramDeclaration(subprogramDeclarationNode);
+            case Node.VariableDeclarationNode variableDeclarationNode ->
+                    runVariableDeclaration(variableDeclarationNode);
         }
     }
 
@@ -139,7 +143,7 @@ public class Interpreter {
         Node.IdNode name = registroDeclarationNode.name();
 
         Map<String, Node.TypeNode> fields = registroDeclarationNode.variableDeclarationContexts().nodes().stream()
-            .collect(Collectors.toMap(x -> x.name().id(), Node.VariableDeclarationNode::type));
+                .collect(Collectors.toMap(x -> x.name().id(), Node.VariableDeclarationNode::type));
 
         userDefinedTypeMap.put(name.id(), new UserDefinedType(name.id(), fields));
     }
@@ -183,8 +187,10 @@ public class Interpreter {
 
     private void runSubprogramDeclaration(Node.SubprogramDeclarationNode subprogramDeclarationNode) {
         switch (subprogramDeclarationNode) {
-            case Node.FunctionDeclarationNode functionDeclarationNode -> functions.put(functionDeclarationNode.name().id(), functionDeclarationNode);
-            case Node.ProcedureDeclarationNode procedureDeclarationNode -> procedures.put(procedureDeclarationNode.name().id(), procedureDeclarationNode);
+            case Node.FunctionDeclarationNode functionDeclarationNode ->
+                    functions.put(functionDeclarationNode.name().id(), functionDeclarationNode);
+            case Node.ProcedureDeclarationNode procedureDeclarationNode ->
+                    procedures.put(procedureDeclarationNode.name().id(), procedureDeclarationNode);
         }
     }
 
@@ -196,7 +202,8 @@ public class Interpreter {
             case Node.ChooseCaseNode _ -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
             case Node.ChooseCommandNode chooseCommandNode -> runChooseCommand(chooseCommandNode);
             case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
-            case Node.CronometroCommandNode _ -> {}
+            case Node.CronometroCommandNode _ -> {
+            }
             case Node.DebugCommandNode debugCommandNode -> runDebugCommand(debugCommandNode);
             case Node.EndAlgorithmCommand _ -> throw new StopExecutionException();
             case Node.EcoCommandNode ecoCommandNode -> eco = ecoCommandNode.on();
@@ -232,10 +239,12 @@ public class Interpreter {
                 stack.lastEntry().getValue().put("(RESULTADO)", evaluate(returnNode.expr()));
                 throw new ReturnException();
             }
-            case Node.TimerCommandNode _ -> {}
+            case Node.TimerCommandNode _ -> {
+            }
             case Node.WhileCommandNode whileCommandNode -> runWhileCommand(whileCommandNode);
             case Node.WriteCommandNode writeCommandNode -> runWriteCommandNode(writeCommandNode);
-            case Node.WriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision, _) -> runWriteItemNode(expr, spaces, precision);
+            case Node.WriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision, _) ->
+                    runWriteItemNode(expr, spaces, precision);
         }
     }
 
@@ -243,22 +252,22 @@ public class Interpreter {
         Node.ExpressionNode test = chooseCommandNode.expr();
         for (Node.ChooseCaseNode chooseCaseNode : chooseCommandNode.cases().nodes()) {
             for (Node.ExpressionNode values : chooseCaseNode.value().nodes()) {
-                 switch (values) {
-                     case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
-                         int value = ((Number) evaluate(test)).intValue();
-                         if (value >= ((Number) evaluate(start)).intValue() && value <= ((Number) evaluate(end)).intValue()) {
-                             run(chooseCaseNode.commands());
-                             return;
-                         }
-                     }
-                     case Node.ExpressionNode e -> {
-                         if (evaluate(new Node.EqNode(test, e, Optional.empty()))) {
-                             run(chooseCaseNode.commands());
-                             return;
-                         }
-                     }
-                 }
-             }
+                switch (values) {
+                    case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
+                        int value = ((Number) evaluate(test)).intValue();
+                        if (value >= ((Number) evaluate(start)).intValue() && value <= ((Number) evaluate(end)).intValue()) {
+                            run(chooseCaseNode.commands());
+                            return;
+                        }
+                    }
+                    case Node.ExpressionNode e -> {
+                        if (evaluate(new Node.EqNode(test, e, Optional.empty()))) {
+                            run(chooseCaseNode.commands());
+                            return;
+                        }
+                    }
+                }
+            }
         }
         Node.ChooseCaseNode caseNode = Objects.requireNonNull(chooseCommandNode.defaultCase());
         run(caseNode.commands());
@@ -296,29 +305,16 @@ public class Interpreter {
                 Node node = arrayAccessNode.node();
                 Object o = evaluateVariableOrFunction(getIdentifierForArray(node));
                 Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
-                switch(indexes.nodes().size()) {
-                    case 1 -> {
-                        int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
-                        if (o.getClass().getComponentType() != evaluate.getClass()) {
-                            if (o instanceof Double[] && evaluate instanceof Integer i)
-                                evaluate = i.doubleValue();
-                            else
-                                throw new TypeException.InvalidAssignment(o.getClass().getComponentType(), evaluate.getClass());
-                        }
-                        Array.set(o, index, evaluate);
-                    }
-                    case 2 -> {
+                switch (o) {
+                    case Object[][] multiarray -> {
                         int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                         int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
-                        Object array = Array.get(o, index1);
-                        if (array.getClass().getComponentType() != evaluate.getClass()) {
-                            if (o instanceof Double[] && evaluate instanceof Integer i)
-                                evaluate = i.doubleValue();
-                            else
-                                throw new TypeException.InvalidAssignment(array.getClass().getComponentType(), evaluate.getClass());
-                        }
-
-                        Array.set(array, index2, evaluate);
+                        Object[] array = multiarray[index1];
+                        assignToArray(array, index2, evaluate);
+                    }
+                    case Object[] array -> {
+                        int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
+                        assignToArray(array, index, evaluate);
                     }
                     default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
                 }
@@ -353,6 +349,18 @@ public class Interpreter {
             }
             case null, default -> throw unsupportedType(assignmentNode);
         }
+    }
+
+    private static void assignToArray(Object[] array, int index, Object evaluate) {
+        Class<?> componentType = array.getClass().getComponentType();
+        if (componentType != evaluate.getClass()) {
+            if (array instanceof Double[] && evaluate instanceof Integer i) {
+                evaluate = i.doubleValue();
+            } else {
+                throw new TypeException.InvalidAssignment(componentType, evaluate.getClass());
+            }
+        }
+        array[index] = evaluate;
     }
 
     private void runWriteItemNode(Node.ExpressionNode expr, Node spaces, Node precision) {
@@ -393,26 +401,26 @@ public class Interpreter {
         readCommandNode.exprList().nodes().forEach(expr -> {
             switch (expr) {
                 case Node.IdNode idNode -> {
-                    Object o = evaluateVariableOrFunction(idNode);
-                    InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(o.getClass()));
-                    Object value = readValue(inputRequest, o);
+                    Object variable = evaluateVariableOrFunction(idNode);
+                    InputRequestValue inputRequest = new InputRequestValue(idNode.id(), InputRequestValue.Type.fromClass(variable.getClass()));
+                    Object value = readValue(inputRequest, variable);
                     assignVariable(idNode.id(), value, AssignContext.SIMPLE);
                 }
                 case Node.ArrayAccessNode arrayAccessNode -> {
                     Node.IdNode node = getIdentifierForArray(arrayAccessNode.node());
-                    Object o = evaluateVariableOrFunction(node);
-
                     Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
-                    switch(o) {
+                    Object variable = evaluateVariableOrFunction(node);
+                    final Class<?> componentType = variable.getClass().getComponentType();
+                    switch (variable) {
                         case Object[][] multiarray -> {
                             int index1 = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                             int index2 = ((Number) evaluate(indexes.nodes().getLast())).intValue();
-                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType().getComponentType()));
+                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index1 + "," + index2 + "]", InputRequestValue.Type.fromClass(componentType.getComponentType()));
                             multiarray[index1][index2] = readValue(inputRequest, multiarray[index1][index2]);
                         }
                         case Object[] array -> {
                             int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
-                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(o.getClass().getComponentType()));
+                            InputRequestValue inputRequest = new InputRequestValue(node.id() + "[" + index + "]", InputRequestValue.Type.fromClass(componentType));
                             array[index] = readValue(inputRequest, array[index]);
                         }
                         default -> throw new TypeException.InvalidIndex(indexes.nodes().size());
@@ -468,16 +476,19 @@ public class Interpreter {
         return stack.reversed().values().stream().filter(m -> m.containsKey(idNode.id())).map(m -> m.get(idNode.id())).findFirst()
                 .or(() -> Optional.ofNullable(functions.get(idNode.id())).map(_ -> new Node.FunctionCallNode(idNode, Node.CompundNode.empty(), Optional.empty())).map(this::evaluateFunction))
                 .or(() -> Optional.ofNullable(StandardFunctions.FUNCTIONS.get(idNode.id())).map(_ -> new Node.FunctionCallNode(idNode, Node.CompundNode.empty(), Optional.empty())).map(this::evaluateFunction))
-            .orElseThrow(() -> new TypeException.VariableNotFound(idNode.id()));
+                .orElseThrow(() -> new TypeException.VariableNotFound(idNode.id()));
     }
 
     private void runForCommand(Node.ForCommandNode forCommandNode) {
         Node.IdNode identifier = forCommandNode.identifier();
 
-        switch(forCommandNode) {
+        switch (forCommandNode) {
             case Node.ForCommandNode(_, _, Node.EmptyExpressionNode _, _, _, _) -> {
             }
-            case Node.ForCommandNode(Node.IdNode id, Node.ExpressionNode start, Node.ExpressionNode end, Node.ExpressionNode step, Node.CompundNode<Node.CommandNode> command, _) -> {
+            case Node.ForCommandNode(
+                    Node.IdNode id, Node.ExpressionNode start, Node.ExpressionNode end, Node.ExpressionNode step,
+                    Node.CompundNode<Node.CommandNode> command, _
+            ) -> {
                 evaluateVariableOrFunction(identifier);
                 int startValue = this.<Number>evaluate(start).intValue();
                 int endValue = this.<Number>evaluate(end).intValue();
@@ -555,7 +566,7 @@ public class Interpreter {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T evaluate(Node.ExpressionNode node){
+    private <T> T evaluate(Node.ExpressionNode node) {
         return (T) switch (node) {
             case Node.StringLiteralNode(var value, _) -> value;
             case Node.BinaryNode binaryNode -> evaluateBinaryNode(binaryNode);
@@ -594,9 +605,11 @@ public class Interpreter {
             case null, default -> throw new TypeException.InvalidOperand(Operator.NOT, notNode.expr().getClass());
         };
     }
+
     private static UnsupportedOperationException unsupportedType(Object evaluate) {
         return new UnsupportedOperationException("Unsupported type: " + evaluate);
     }
+
     private Object evaluateNegNode(Node.NegNode nedNode) {
         return switch (evaluate(nedNode.expr())) {
             case Double d -> -d;
@@ -609,7 +622,7 @@ public class Interpreter {
         Object o = evaluateVariableOrFunction(getIdentifierForArray(arrayAccessNode.node()));
 
         Node.CompundNode<Node.ExpressionNode> indexes = arrayAccessNode.indexes();
-        switch(indexes.nodes().size()) {
+        switch (indexes.nodes().size()) {
             case 1 -> {
                 int index = ((Number) evaluate(indexes.nodes().getFirst())).intValue();
                 return Array.get(o, index);
@@ -663,7 +676,7 @@ public class Interpreter {
 
         run(parametersDeclaration);
         run(subprogramDeclaration.declarations());
-        for (int i = 0; i < parameters.size(); i++){
+        for (int i = 0; i < parameters.size(); i++) {
             assignVariable(parameters.get(i).name().id(), argumentValues.get(i), AssignContext.ARGUMENT);
         }
         try {
@@ -676,10 +689,10 @@ public class Interpreter {
         };
 
         List<Object> referenceValues = parameters.stream()
-            .map(Node.VariableDeclarationNode::name)
-            .map(Node.IdNode::id)
-            .map(localVariables::remove)
-            .toList();
+                .map(Node.VariableDeclarationNode::name)
+                .map(Node.IdNode::id)
+                .map(localVariables::remove)
+                .toList();
 
         stack.remove(stackId);
 
@@ -704,7 +717,9 @@ public class Interpreter {
         };
     }
 
-    record PairValue(Object left, Object right) {}
+    record PairValue(Object left, Object right) {
+    }
+
     private Object evaluateBinaryNode(Node.BinaryNode binaryNode) {
 
         return switch (binaryNode) {
@@ -718,7 +733,8 @@ public class Interpreter {
 
                     case PairValue(Number x, Number y) -> x.intValue() + y.intValue();
                     case PairValue(String x, String y) -> x + y;
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.ADD, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.ADD, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.DivNode(Node.ExpressionNode left, Node.ExpressionNode right, boolean integerResult, _) -> {
@@ -730,7 +746,8 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x / y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() / y.intValue();
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.DIVIDE, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.DIVIDE, leftResult.getClass(), rightResult.getClass());
                 };
                 yield integerResult ? result.intValue() : result;
             }
@@ -756,7 +773,8 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x * y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() * y.intValue();
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.MULTIPLY, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.MULTIPLY, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -765,11 +783,12 @@ public class Interpreter {
                 Object rightResult = evaluate(right);
 
                 yield switch (new PairValue(leftResult, rightResult)) {
-                    case PairValue(Number x, Double y) -> Math.pow(x.doubleValue(),y);
+                    case PairValue(Number x, Double y) -> Math.pow(x.doubleValue(), y);
                     case PairValue(Double x, Number y) -> Math.pow(x, y.doubleValue());
 
                     case PairValue(Number x, Number y) -> (int) Math.pow(x.intValue(), y.intValue());
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.POW, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.POW, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.SubNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -781,7 +800,8 @@ public class Interpreter {
                     case PairValue(Double x, Number y) -> x - y.doubleValue();
 
                     case PairValue(Number x, Number y) -> x.intValue() - y.intValue();
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.SUBTRACT, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.SUBTRACT, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.RelationalNode relationalNode -> evaluateRelationalNode(relationalNode);
@@ -796,7 +816,8 @@ public class Interpreter {
 
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean x, Boolean y) -> x && y;
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.AND, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.AND, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.OrNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -805,7 +826,8 @@ public class Interpreter {
 
                 yield switch (new PairValue(leftResult, rightResult)) {
                     case PairValue(Boolean x, Boolean y) -> x || y;
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.OR, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.OR, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -854,7 +876,8 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(Number x, Number y) -> x.intValue() <= y.intValue();
                     case PairValue(String x, String y) -> x.compareToIgnoreCase(y) <= 0;
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.LESS_THAN_OR_EQUALS, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.LESS_THAN_OR_EQUALS, leftResult.getClass(), rightResult.getClass());
                 };
             }
             case Node.LtNode(Node.ExpressionNode left, Node.ExpressionNode right, _) -> {
@@ -871,7 +894,8 @@ public class Interpreter {
 
                     case PairValue(Number x, Number y) -> x.intValue() < y.intValue();
                     case PairValue(String x, String y) -> x.compareToIgnoreCase(y) < 0;
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.LESS_THAN, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.LESS_THAN, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -884,7 +908,8 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(String x, String y) -> x.equalsIgnoreCase(y);
                     case PairValue(Object x, Object y) -> x.equals(y);
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.EQUALS, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.EQUALS, leftResult.getClass(), rightResult.getClass());
                 };
             }
 
@@ -897,7 +922,8 @@ public class Interpreter {
                     case PairValue(Number _, Boolean y) -> y;
                     case PairValue(String x, String y) -> !x.equalsIgnoreCase(y);
                     case PairValue(Object x, Object y) -> !x.equals(y);
-                    case Object _ -> throw new TypeException.InvalidOperand(Operator.NOT_EQUALS, leftResult.getClass(), rightResult.getClass());
+                    case Object _ ->
+                            throw new TypeException.InvalidOperand(Operator.NOT_EQUALS, leftResult.getClass(), rightResult.getClass());
                 };
             }
         };
@@ -960,7 +986,7 @@ public class Interpreter {
             case Node.CaracterType _ -> String.class;
             case Node.LogicoType _ -> Boolean.class;
             case Node.UserDefinedType(Node.StringLiteralNode(var type, _), _) -> switch (type.toLowerCase()) {
-                    case String s -> {
+                case String s -> {
                     if (!userDefinedTypeMap.containsKey(s)) {
                         throw new TypeException.TypeNotFound(s);
                     }
