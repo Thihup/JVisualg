@@ -123,10 +123,10 @@ public class Main extends Application {
         runButton.addEventHandler(ActionEvent.ACTION, _ -> {
             Platform.runLater(() -> {
                 switch (interpreter.state()) {
-                    case Interpreter.State.Running _ -> {
+                    case InterpreterState.Running _ -> {
                     }
-                    case Interpreter.State.PausedDebug _ -> interpreter.continueExecution();
-                    case Interpreter.State.NotStarted _ -> {
+                    case InterpreterState.PausedDebug _ -> interpreter.continueExecution();
+                    case InterpreterState.NotStarted _ -> {
                         resetExecution();
 
                         interpreter.run(codeArea.getText(), executor)
@@ -134,7 +134,7 @@ public class Main extends Application {
                                 .exceptionally(this::handleExecutionError)
                                 .whenComplete((_, _) -> Platform.runLater(this::removeDebugStyleFromPreviousLine));
                     }
-                    case Interpreter.State.CompletedExceptionally _, Interpreter.State.CompletedSuccessfully _, Interpreter.State.ForcedStop _ -> {
+                    case InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _, InterpreterState.ForcedStop _ -> {
                     }
                 }
             });
@@ -179,7 +179,7 @@ public class Main extends Application {
         dosWindow.show();
     }
 
-    private void updateDebugArea(Interpreter.ProgramState programState) {
+    private void updateDebugArea(ProgramState programState) {
         debugArea.getItems().clear();
         programState.stack().entrySet().stream()
                 .mapMulti((Map.Entry<String, Map<String, Object>> entry, Consumer<DebugState> consumer) -> {
@@ -364,8 +364,8 @@ public class Main extends Application {
         }
     }
 
-    private CompletableFuture<InputValue> readVariable(InputRequestValue request) {
-        CompletableFuture<InputValue> inputValueCompletableFuture = new CompletableFuture<>();
+    private CompletableFuture<Optional<InputValue>> readVariable(InputRequestValue request) {
+        CompletableFuture<Optional<InputValue>> inputValueCompletableFuture = new CompletableFuture<>();
 
         Platform.runLater(() -> {
             if (dosWindow.isShowing()) {
@@ -374,8 +374,8 @@ public class Main extends Application {
                 callback = strip -> {
                     strip = strip.strip();
                     getValue(request, strip)
-                            .ifPresentOrElse(inputValueCompletableFuture::complete,
-                                    () -> inputValueCompletableFuture.complete(null));
+                            .ifPresentOrElse(value -> inputValueCompletableFuture.complete(Optional.of(value)),
+                                    () -> inputValueCompletableFuture.complete(Optional.empty()));
                 };
                 return;
             }
@@ -383,8 +383,8 @@ public class Main extends Application {
             textInputDialog.setContentText("Digite um valor " + request.type() + "  para a variável " + request.variableName());
             textInputDialog.showAndWait()
                     .flatMap(textValue -> getValue(request, textValue))
-                    .ifPresentOrElse(inputValueCompletableFuture::complete,
-                            () -> inputValueCompletableFuture.complete(null));
+                    .ifPresentOrElse(value -> inputValueCompletableFuture.complete(Optional.of(value)),
+                            () -> inputValueCompletableFuture.complete(Optional.empty()));
         });
 
         return inputValueCompletableFuture;
@@ -415,21 +415,21 @@ public class Main extends Application {
                 case F9 -> runButton.fire();
                 case F8 -> {
                     switch (interpreter.state()) {
-                        case Interpreter.State.PausedDebug _ -> {
+                        case InterpreterState.PausedDebug _ -> {
                             interpreter.step();
                         }
-                        case Interpreter.State.NotStarted _, Interpreter.State.ForcedStop _, Interpreter.State.CompletedExceptionally _, Interpreter.State.CompletedSuccessfully _ -> {
+                        case InterpreterState.NotStarted _, InterpreterState.ForcedStop _, InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _ -> {
                             breakpointLines.addLast(1);
                             runButton.fire();
                         }
-                        case Interpreter.State.Running _ -> {
+                        case InterpreterState.Running _ -> {
                         }
                     }
                 }
                 case ESCAPE -> {
                     switch (interpreter.state()) {
-                        case Interpreter.State.ForcedStop _, Interpreter.State.CompletedExceptionally _, Interpreter.State.CompletedSuccessfully _ -> dosWindow.hide();
-                        case Interpreter.State.PausedDebug _, Interpreter.State.NotStarted _, Interpreter.State.Running _ -> {}
+                        case InterpreterState.ForcedStop _, InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _ -> dosWindow.hide();
+                        case InterpreterState.PausedDebug _, InterpreterState.NotStarted _, InterpreterState.Running _ -> {}
                     }
                 }
                 default -> {

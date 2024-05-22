@@ -27,10 +27,12 @@ public class ExamplesBase {
         try {
             FileSystem fileSystem = FileSystems.newFileSystem(start, Map.of());
             return Files.walk(fileSystem.getPath(ExamplesBase.class.getPackageName().replace('.', '/') + "/" + folder))
-                .filter(Files::isRegularFile);
+                .filter(Files::isRegularFile)
+                .filter(x -> x.toString().toLowerCase().endsWith(".alg"));
         } catch (Exception e) {
             return Files.walk(Path.of(start))
-                    .filter(Files::isRegularFile);
+                    .filter(Files::isRegularFile)
+                    .filter(x -> x.toString().toLowerCase().endsWith(".alg"));
         }
     }
 

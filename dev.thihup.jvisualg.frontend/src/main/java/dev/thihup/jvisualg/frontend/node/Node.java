@@ -1,7 +1,5 @@
 package dev.thihup.jvisualg.frontend.node;
 
-import org.jspecify.annotations.NullMarked;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -119,7 +117,7 @@ public sealed interface Node {
             }
             case DebugCommandNode debugCommandNode -> Stream.of(debugCommandNode.expr());
             case AleatorioRangeNode aleatorioRangeNode -> Stream.of(aleatorioRangeNode.start(), aleatorioRangeNode.end(), aleatorioRangeNode.decimalPlaces());
-            case ArquivoCommandNode arquivoCommandNode -> Stream.of(arquivoCommandNode.name());
+            case ArquivoCommandNode arquivoCommandNode -> Stream.of(arquivoCommandNode.filename());
             case TimerCommandNode _, PausaCommandNode _, EcoCommandNode _,
                  CronometroCommandNode _, LimpatelaCommandNode _ -> Stream.of();
             case UserDefinedType(var type, _) -> Stream.of(type);
@@ -586,9 +584,9 @@ public sealed interface Node {
     }
 
 
-    record ArquivoCommandNode(Node name, Optional<Location> location) implements CommandNode {
+    record ArquivoCommandNode(StringLiteralNode filename, Optional<Location> location) implements CommandNode {
         public ArquivoCommandNode {
-            Objects.requireNonNull(name);
+            Objects.requireNonNull(filename);
             Objects.requireNonNull(location);
         }
     }

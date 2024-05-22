@@ -484,7 +484,8 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
 
     @Override
     public Node visitArquivoCommand(VisuAlgParser.ArquivoCommandContext ctx) {
-        return new ArquivoCommandNode(new StringLiteralNode(ctx.STRING().getText(), fromTerminalNode(ctx.STRING())), fromRuleContext(ctx));
+        TerminalNode text = ctx.STRING();
+        return new ArquivoCommandNode(new StringLiteralNode(text.getText().substring(1, text.getText().length() - 1), fromTerminalNode(text)), fromRuleContext(ctx));
     }
 
 

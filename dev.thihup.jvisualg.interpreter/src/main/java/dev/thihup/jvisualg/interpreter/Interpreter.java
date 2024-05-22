@@ -11,7 +11,6 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Array;
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.*;
@@ -23,80 +22,27 @@ import java.util.stream.Collectors;
 @NullMarked
 public class Interpreter {
 
-    public final SequencedMap<String, Map<String, Object>> stack = new LinkedHashMap<>();
+    private final SequencedMap<String, Map<String, Object>> stack = new LinkedHashMap<>();
     private final Map<String, Node.FunctionDeclarationNode> functions = new LinkedHashMap<>();
     private final Map<String, Node.ProcedureDeclarationNode> procedures = new LinkedHashMap<>();
     private final Map<String, UserDefinedType> userDefinedTypeMap = new LinkedHashMap<>();
-    private static final RandomGenerator random = RandomGenerator.getDefault();
+    private final RandomGenerator random = RandomGenerator.getDefault();
     private final IO io;
-    @Nullable
     private final Consumer<ProgramState> debuggerCallback;
+    private final List<Integer> breakpoints = new ArrayList<>();
+    private final InputState.ReadInput inputFromIO;
 
-    private AleatorioState aleatorio = AleatorioState.Off.INSTANCE;
+    private volatile InterpreterState state = InterpreterState.NotStarted.INSTANCE;
+    private InputState inputState;
     private boolean eco = false;
-    private List<Integer> breakpoints = new ArrayList<>();
-
-    public sealed interface State {
-        enum NotStarted implements State {INSTANCE}
-
-        enum Running implements State {INSTANCE}
-
-        record PausedDebug(int lineNumber) implements State {
-        }
-
-        enum CompletedSuccessfully implements State {INSTANCE}
-
-        record CompletedExceptionally(Throwable throwable) implements State {
-        }
-
-        enum ForcedStop implements State {INSTANCE}
-    }
-    private volatile State state = State.NotStarted.INSTANCE;
-
-    private sealed interface AleatorioState {
-
-        default InputValue generateValue(InputRequestValue requestValue) {
-            throw new UnsupportedOperationException();
-        }
-
-        record Range(int start, int end, int decimalPlaces) implements AleatorioState {
-            @Override
-            public InputValue generateValue(InputRequestValue requestValue) {
-                return switch (requestValue.type()) {
-                    case CARACTER -> new InputValue.CaracterValue(random.ints(65, 91)
-                            .limit(5)
-                            .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
-                    case LOGICO -> new InputValue.LogicoValue(random.nextBoolean());
-                    case REAL -> new InputValue.RealValue(generateRandomDouble(this));
-                    case INTEIRO -> new InputValue.InteiroValue(random.nextInt(start, end));
-                };
-
-            }
-
-            private double generateRandomDouble(AleatorioState.Range range) {
-                double v = random.nextDouble(range.start(), range.end());
-
-                if (range.decimalPlaces == 0) {
-                    return (int) v;
-                }
-                BigDecimal bd = new BigDecimal(v);
-                bd = bd.setScale(range.decimalPlaces, RoundingMode.HALF_UP);
-                return bd.doubleValue();
-
-            }
-        }
-        enum Off implements AleatorioState {
-            INSTANCE
-        }
-    }
 
 
-    public record ProgramState(int lineNumber, Map<String, Map<String, Object>> stack) {
-    }
 
     public Interpreter(IO io, @Nullable Consumer<ProgramState> debuggerCallback) {
         this.io = io;
-        this.debuggerCallback = debuggerCallback;
+        this.debuggerCallback = debuggerCallback == null ? x -> continueExecution() : debuggerCallback;
+        this.inputFromIO = new InputState.ReadInput(io);
+        this.inputState = inputFromIO;
     }
 
     public Interpreter(IO io) {
@@ -113,16 +59,16 @@ public class Interpreter {
         procedures.clear();
         stack.clear();
         breakpoints.clear();
-        state = State.NotStarted.INSTANCE;
+        state = InterpreterState.NotStarted.INSTANCE;
     }
 
-    public State state() {
+    public InterpreterState state() {
         return state;
     }
 
     public CompletableFuture<Void> run(String code, ExecutorService executorService) {
         return CompletableFuture.runAsync(() -> {
-            state = State.Running.INSTANCE;
+            state = InterpreterState.Running.INSTANCE;
             ASTResult parse = VisualgParser.parse(code);
                 parse.node()
                     .ifPresentOrElse(this::run, () -> {
@@ -130,31 +76,29 @@ public class Interpreter {
                     });
 
         }, executorService).whenComplete((_, exception) -> {
-            if (debuggerCallback != null) {
-                debuggerCallback.accept(new ProgramState(0, stack));
-            }
-            state = exception != null ? new State.CompletedExceptionally(exception) : State.CompletedSuccessfully.INSTANCE;
+            debuggerCallback.accept(new ProgramState(0, stack));
+            state = exception != null ? new InterpreterState.CompletedExceptionally(exception) : InterpreterState.CompletedSuccessfully.INSTANCE;
         });
     }
 
     private void run(Node node) {
         try {
             switch (state) {
-                case State.ForcedStop _ -> throw new CancellationException("Program was cancelled");
-                case State.CompletedSuccessfully _ -> {
+                case InterpreterState.ForcedStop _ -> throw new CancellationException("Program was cancelled");
+                case InterpreterState.CompletedSuccessfully _ -> {
                     return;
                 }
-                case State.PausedDebug _ -> handleDebugCommand(node);
+                case InterpreterState.PausedDebug _ -> handleDebugCommand(node);
 
-                case State.CompletedExceptionally _, State.Running _, State.NotStarted _ -> {
+                case InterpreterState.CompletedExceptionally _, InterpreterState.Running _, InterpreterState.NotStarted _ -> {
                 }
 
             }
 
             int lineNumber = node.location().orElse(Location.EMPTY).startLine();
-            if (!(state instanceof State.PausedDebug) && breakpoints.contains(lineNumber) &&
+            if (!(state instanceof InterpreterState.PausedDebug) && breakpoints.contains(lineNumber) &&
                 !(node instanceof Node.CompundNode<?>)) {
-                state = new State.PausedDebug(lineNumber);
+                state = new InterpreterState.PausedDebug(lineNumber);
                 handleDebugCommand(node);
             }
 
@@ -168,9 +112,9 @@ public class Interpreter {
                 case Node.ExpressionNode e -> evaluate(e);
             }
         } catch (IOException | InterruptedException | BrokenBarrierException e) {
-            state = new State.CompletedExceptionally(e);
+            state = new InterpreterState.CompletedExceptionally(e);
         } catch (StopExecutionException _) {
-            state = State.CompletedSuccessfully.INSTANCE;
+            state = InterpreterState.CompletedSuccessfully.INSTANCE;
         }
     }
 
@@ -179,7 +123,7 @@ public class Interpreter {
     }
 
     public void stop() {
-        state = State.ForcedStop.INSTANCE;
+        state = InterpreterState.ForcedStop.INSTANCE;
     }
 
     private void runDeclaration(Node.DeclarationNode declarationNode) {
@@ -204,11 +148,10 @@ public class Interpreter {
 
     public void step() {
         try {
-            if (state instanceof State.PausedDebug) {
+            if (state instanceof InterpreterState.PausedDebug) {
                 if (lock.getNumberWaiting() == 1) {
                     lock.await();
                 }
-//                state = State.PAUSED_DEBUG;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
@@ -217,11 +160,11 @@ public class Interpreter {
 
     public void continueExecution() {
         try {
-            if (state instanceof State.PausedDebug) {
+            if (state instanceof InterpreterState.PausedDebug) {
                 if (lock.getNumberWaiting() == 1) {
                     lock.await();
                 }
-                state = State.Running.INSTANCE;
+                state = InterpreterState.Running.INSTANCE;
             }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
@@ -229,14 +172,9 @@ public class Interpreter {
     }
 
     private void handleDebugCommand(Node node) throws BrokenBarrierException, InterruptedException {
-        if (debuggerCallback != null) {
-            debuggerCallback.accept(new ProgramState(node.location().orElse(Location.EMPTY).startLine() - 1, Map.copyOf(stack)));
-            lock.await();
-            lock.reset();
-        }
-        else {
-            continueExecution();
-        }
+        debuggerCallback.accept(new ProgramState(node.location().orElse(Location.EMPTY).startLine() - 1, Map.copyOf(stack)));
+        lock.await();
+        lock.reset();
     }
 
     private void runConstant(Node.ConstantNode constantNode) {
@@ -253,34 +191,10 @@ public class Interpreter {
     private void runCommand(Node.CommandNode commandNode) throws IOException, InterruptedException, BrokenBarrierException {
         switch (commandNode) {
             case Node.AleatorioNode aleatorioNode -> runAleatorio(aleatorioNode);
-            case Node.ArquivoCommandNode _ -> throw new UnsupportedOperationException("ArquivoCommandNode not implemented");
+            case Node.ArquivoCommandNode arquivoCommandNode -> runArquivoCommand(arquivoCommandNode);
             case Node.AssignmentNode assignmentNode -> runAssignment(assignmentNode);
             case Node.ChooseCaseNode _ -> throw new UnsupportedOperationException("ChooseCaseNode not implemented");
-            case Node.ChooseCommandNode chooseCommandNode -> {
-                Node.ExpressionNode test = chooseCommandNode.expr();
-                for (Node.ChooseCaseNode chooseCaseNode : chooseCommandNode.cases().nodes()) {
-                    for (Node.ExpressionNode values : chooseCaseNode.value().nodes()) {
-                         switch (values) {
-                             case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
-                                 int value = ((Number) evaluate(test)).intValue();
-                                 if (value >= ((Number) evaluate(start)).intValue() && value <= ((Number) evaluate(end)).intValue()) {
-                                     run(chooseCaseNode.commands());
-                                     return;
-                                 }
-                             }
-                             case Node.ExpressionNode e -> {
-                                 if (evaluate(new Node.EqNode(test, e, Optional.empty()))) {
-                                     run(chooseCaseNode.commands());
-                                     return;
-                                 }
-                             }
-                         }
-                     }
-                }
-                Node.ChooseCaseNode caseNode = Objects.requireNonNull(chooseCommandNode.defaultCase());
-                var commands = caseNode.commands();
-                run(commands);
-            }
+            case Node.ChooseCommandNode chooseCommandNode -> runChooseCommand(chooseCommandNode);
             case Node.ConditionalCommandNode conditionalCommandNode -> runConditionalCommand(conditionalCommandNode);
             case Node.CronometroCommandNode _ -> {}
             case Node.DebugCommandNode debugCommandNode -> runDebugCommand(debugCommandNode);
@@ -290,7 +204,7 @@ public class Interpreter {
             case Node.InterrompaCommandNode _ -> throw new BreakException();
             case Node.LimpatelaCommandNode _ -> io.output().accept(new OutputEvent.Clear());
             case Node.PausaCommandNode _ -> {
-                state = new State.PausedDebug(commandNode.location().orElse(Location.EMPTY).startLine());
+                state = new InterpreterState.PausedDebug(commandNode.location().orElse(Location.EMPTY).startLine());
                 handleDebugCommand(commandNode);
             }
             case Node.ProcedureCallNode procedureCallNode -> {
@@ -325,18 +239,51 @@ public class Interpreter {
         }
     }
 
+    private void runChooseCommand(Node.ChooseCommandNode chooseCommandNode) {
+        Node.ExpressionNode test = chooseCommandNode.expr();
+        for (Node.ChooseCaseNode chooseCaseNode : chooseCommandNode.cases().nodes()) {
+            for (Node.ExpressionNode values : chooseCaseNode.value().nodes()) {
+                 switch (values) {
+                     case Node.RangeNode(Node.ExpressionNode start, Node.ExpressionNode end, _) -> {
+                         int value = ((Number) evaluate(test)).intValue();
+                         if (value >= ((Number) evaluate(start)).intValue() && value <= ((Number) evaluate(end)).intValue()) {
+                             run(chooseCaseNode.commands());
+                             return;
+                         }
+                     }
+                     case Node.ExpressionNode e -> {
+                         if (evaluate(new Node.EqNode(test, e, Optional.empty()))) {
+                             run(chooseCaseNode.commands());
+                             return;
+                         }
+                     }
+                 }
+             }
+        }
+        Node.ChooseCaseNode caseNode = Objects.requireNonNull(chooseCommandNode.defaultCase());
+        run(caseNode.commands());
+    }
+
+    private void runArquivoCommand(Node.ArquivoCommandNode arquivoCommandNode) {
+        try {
+            inputState = InputState.compose(new InputState.Arquivo(arquivoCommandNode.filename().value()), inputFromIO);
+        } catch (IOException e) {
+            inputState = inputFromIO;
+        }
+    }
+
     private void runAleatorio(Node.AleatorioNode aleatorioNode) {
         switch (aleatorioNode) {
-            case Node.AleatorioOffNode _ -> aleatorio = AleatorioState.Off.INSTANCE;
-            case Node.AleatorioOnNode _ -> aleatorio = new AleatorioState.Range(0, 100, 0);
+            case Node.AleatorioOffNode _ -> inputState = inputFromIO;
+            case Node.AleatorioOnNode _ -> inputState = new InputState.Aleatorio(random, 0, 100, 0);
             case Node.AleatorioRangeNode aleatorioRangeNode ->
-                    aleatorio = new AleatorioState.Range(evaluate(aleatorioRangeNode.start()), evaluate(aleatorioRangeNode.end()), evaluate(aleatorioRangeNode.decimalPlaces()));
+                    inputState = new InputState.Aleatorio(random, evaluate(aleatorioRangeNode.start()), evaluate(aleatorioRangeNode.end()), evaluate(aleatorioRangeNode.decimalPlaces()));
         }
     }
 
     private void runDebugCommand(Node.DebugCommandNode debugCommandNode) throws BrokenBarrierException, InterruptedException {
         if (evaluate(debugCommandNode.expr())) {
-            state = new State.PausedDebug(debugCommandNode.location().orElse(Location.EMPTY).startLine());
+            state = new InterpreterState.PausedDebug(debugCommandNode.location().orElse(Location.EMPTY).startLine());
             handleDebugCommand(debugCommandNode);
         }
     }
@@ -496,8 +443,7 @@ public class Interpreter {
     }
 
     private Object readValue(InputRequestValue inputRequest, Object o) {
-        boolean aleatorioEnabled = aleatorio != AleatorioState.Off.INSTANCE;
-        InputValue inputValue = aleatorioEnabled ? aleatorio.generateValue(inputRequest) : io.input().apply(inputRequest).join();
+        InputValue inputValue = inputState.generateValue(inputRequest).orElseThrow();
         Object value = switch (o) {
             case Integer _ when inputValue instanceof InputValue.InteiroValue(var value1) -> value1;
             case Double _ when inputValue instanceof InputValue.RealValue(var value1) -> value1;
@@ -505,7 +451,7 @@ public class Interpreter {
             case Boolean _ when inputValue instanceof InputValue.LogicoValue(var value1) -> value1;
             default -> throw new TypeException.MissingInput(inputRequest);
         };
-        if (eco && aleatorioEnabled)
+        if (eco && !(inputState instanceof InputState.ReadInput))
             io.output().accept(new OutputEvent.Text(value + "\n"));
         return value;
     }

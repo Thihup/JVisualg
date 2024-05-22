@@ -9,6 +9,7 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -440,7 +441,7 @@ class InterpreterTest extends ExamplesBase {
     @Test
     void testRead() {
         StringWriter stringWriter = new StringWriter();
-        Interpreter interpreter = new Interpreter(new IO(_ -> CompletableFuture.completedFuture(new InputValue.InteiroValue(5)), s -> {
+        Interpreter interpreter = new Interpreter(new IO(_ -> CompletableFuture.completedFuture(Optional.of(new InputValue.InteiroValue(5))), s -> {
             switch (s) {
                 case OutputEvent.Text(String text) -> stringWriter.write(text);
                 case OutputEvent.ChangeColor _, OutputEvent.Clear _ -> {
@@ -460,29 +461,36 @@ class InterpreterTest extends ExamplesBase {
 
         assertEquals(
                 """
-                Number:  5
-                """, stringWriter.toString());
+                        Number:  5
+                        """, stringWriter.toString());
     }
 
     @ParameterizedTest
     @MethodSource({"examplesV25", "examplesV30", "examplesCustom"})
     void testExamples(Path path) throws Throwable {
         RandomGenerator aDefault = RandomGenerator.getDefault();
-
+        StringBuilder stringBuilder = new StringBuilder();
         IO io = new IO(
-                inputRequest -> CompletableFuture.completedFuture(switch (inputRequest.type()) {
+                inputRequest -> CompletableFuture.completedFuture(Optional.of(switch (inputRequest.type()) {
                     case INTEIRO -> new InputValue.InteiroValue(aDefault.nextInt(1, 10));
                     case REAL -> new InputValue.RealValue(aDefault.nextDouble(1, 10));
                     case LOGICO -> new InputValue.LogicoValue(aDefault.nextBoolean());
                     case CARACTER -> new InputValue.CaracterValue(aDefault.ints(65, 91)
                             .limit(5)
                             .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
-                })
-                , _ -> {
+                }))
+                , a -> {
+            switch (a) {
+                case OutputEvent.Text(String t) -> stringBuilder.append(t);
+                default -> {
+                }
+            }
         });
 
         Interpreter interpreter = new Interpreter(io);
 
         interpreter.run(Files.readString(path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor()).get(10, TimeUnit.SECONDS);
+
+        System.out.println(stringBuilder);
     }
 }
