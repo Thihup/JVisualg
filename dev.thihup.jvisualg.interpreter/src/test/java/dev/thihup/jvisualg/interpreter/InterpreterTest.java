@@ -4,6 +4,7 @@ import dev.thihup.jvisualg.examples.ExamplesBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junitpioneer.jupiter.cartesian.CartesianTest;
 
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -515,7 +516,6 @@ class InterpreterTest extends ExamplesBase {
     @ParameterizedTest
     @MethodSource("exampleErrorsWithType")
     void testExamplesErrors(FileAndError file) throws Throwable {
-        RandomGenerator aDefault = RandomGenerator.getDefault();
         StringBuilder stringBuilder = new StringBuilder();
         IO io = new IO(
             _ -> CompletableFuture.completedFuture(Optional.empty()),
@@ -539,4 +539,81 @@ class InterpreterTest extends ExamplesBase {
         }
 
     }
+
+    enum Types {
+        CARACTER, LOGICO, REAL, INTEIRO
+    }
+
+    @CartesianTest
+    void testBinaryOperands(@CartesianTest.Values(strings = {">", ">=", "<", "<=", "<>", "=", "e", "ou"}) String operand,
+                            @CartesianTest.Enum(Types.class) Types type1,
+                            @CartesianTest.Enum(Types.class) Types type2) throws Throwable {
+        StringBuilder stringBuilder = new StringBuilder();
+        IO io = new IO(
+                _ -> CompletableFuture.completedFuture(Optional.empty()),
+                a -> {
+                    switch (a) {
+                        case OutputEvent.Text(String t) -> stringBuilder.append(t);
+                        default -> {
+                        }
+                    }
+                });
+
+        Interpreter interpreter = new Interpreter(io);
+
+        String program = """
+                algoritmo "operands"
+                var
+                    x: %s
+                    y: %s
+                inicio
+                    escreval(x %s y)
+                fimalgoritmo
+                """;
+
+        CompletableFuture<Void> run = interpreter.run(program.formatted(type1, type2, operand), Executors.newVirtualThreadPerTaskExecutor());
+        try {
+            run.join();
+        } catch (CompletionException e) {
+            System.out.println(stringBuilder);
+            assertInstanceOf(TypeException.InvalidOperand.class, e.getCause());
+        }
+
+    }
+
+    @CartesianTest
+    void testUnaryOperands(@CartesianTest.Values(strings = {"+", "-", "nao"}) String operand,
+                            @CartesianTest.Enum(Types.class) Types type) throws Throwable {
+        StringBuilder stringBuilder = new StringBuilder();
+        IO io = new IO(
+                _ -> CompletableFuture.completedFuture(Optional.empty()),
+                a -> {
+                    switch (a) {
+                        case OutputEvent.Text(String t) -> stringBuilder.append(t);
+                        default -> {
+                        }
+                    }
+                });
+
+        Interpreter interpreter = new Interpreter(io);
+
+        String program = """
+                algoritmo "operands"
+                var
+                    x: %s
+                inicio
+                    escreval(%s x)
+                fimalgoritmo
+                """;
+
+        CompletableFuture<Void> run = interpreter.run(program.formatted(type, operand), Executors.newVirtualThreadPerTaskExecutor());
+        try {
+            run.join();
+        } catch (CompletionException e) {
+            System.out.println(stringBuilder);
+            assertInstanceOf(TypeException.InvalidOperand.class, e.getCause());
+        }
+
+    }
+
 }
