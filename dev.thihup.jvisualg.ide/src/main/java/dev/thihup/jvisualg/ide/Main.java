@@ -9,12 +9,18 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
+import javafx.geometry.Pos;
+import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.paint.Paint;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontPosture;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import org.eclipse.lsp4j.*;
@@ -31,6 +37,7 @@ import org.reactfx.Subscription;
 import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
+import java.text.BreakIterator;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +45,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Main extends Application {
 
@@ -92,9 +102,24 @@ public class Main extends Application {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("gui.fxml"));
         fxmlLoader.setController(this);
         Parent root = fxmlLoader.load();
-
-        codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
-
+        IntFunction<Node> nodeIntFunction = LineNumberFactory.get(codeArea);
+        codeArea.setParagraphGraphicFactory(lineNumber -> {
+            Label node = (Label) nodeIntFunction.apply(lineNumber);
+            node.setFont(Font.font("monospace", FontPosture.REGULAR, 13));
+            if (breakpointLines.contains(lineNumber)) {
+                Label label = new Label(" ".repeat(node.getText().length() - 1) + ".");
+                label.setTextFill(Paint.valueOf("#ff0000"));
+                label.setAlignment(Pos.BASELINE_RIGHT);
+                label.setPadding(node.getPadding());
+                label.setFont(node.getFont());
+                node.setGraphic(label);
+                node.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            }
+            node.setOnMouseClicked(_ -> handleBreakpointChange(lineNumber));
+            node.setCursor(Cursor.HAND);
+            return node;
+        });
+        breakpointLines.add(5);
         setupSyntaxHighlighting();
 
         setupDefaultText();
@@ -121,30 +146,25 @@ public class Main extends Application {
         });
 
         runButton.addEventHandler(ActionEvent.ACTION, _ -> {
-            Platform.runLater(() -> {
-                switch (interpreter.state()) {
-                    case InterpreterState.Running _ -> {
-                    }
-                    case InterpreterState.PausedDebug _ -> interpreter.continueExecution();
-                    case InterpreterState.NotStarted _ -> {
-                        resetExecution();
-
-                        interpreter.run(codeArea.getText(), executor)
-                                .thenRun(this::handleExecutionSuccessfully)
-                                .exceptionally(this::handleExecutionError)
-                                .whenComplete((_, _) -> Platform.runLater(this::removeDebugStyleFromPreviousLine));
-                    }
-                    case InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _, InterpreterState.ForcedStop _ -> {
-                    }
-                }
-            });
+            handleStartOrContinue();
         });
 
 
         setupErrorPopup();
-
+        stage.onCloseRequestProperty().addListener(_ -> dosWindow.close());
         if (Boolean.getBoolean("autoClose"))
             Platform.runLater(stage::close);
+    }
+
+
+    private void startExecution(InterpreterState interpreterState) {
+        interpreter.runWithState(codeArea.getText(), interpreterState);
+        switch (interpreter.state()) {
+            case InterpreterState.CompletedSuccessfully _ -> this.handleExecutionSuccessfully();
+            case InterpreterState.CompletedExceptionally(Throwable e) -> this.handleExecutionError(e);
+            default -> throw new IllegalStateException("Unexpected value: " + interpreter.state());
+        }
+        Platform.runLater(this::removeDebugStyleFromPreviousLine);
     }
 
     private Void handleExecutionError(Throwable e) {
@@ -172,7 +192,7 @@ public class Main extends Application {
         appendOutput("Início da execução\n", ToWhere.OUTPUT, When.NOW);
         interpreter.reset();
         previousDebugLine = -1;
-        breakpointLines.forEach(interpreter::addBreakpoint);
+        breakpointLines.forEach(location -> interpreter.addBreakpoint(location + 1));
 
         dosContent.setStyle(DEFAULT_CONSOLE_STYLE);
         dosContent.clear();
@@ -184,8 +204,8 @@ public class Main extends Application {
         programState.stack().entrySet().stream()
                 .mapMulti((Map.Entry<String, Map<String, Object>> entry, Consumer<DebugState> consumer) -> {
                     entry.getValue().forEach((variableName, variableValue) -> {
-                        final String scopeName = entry.getKey().toUpperCase();
-                        final String variableNameUpperCase = variableName.toUpperCase();
+                        String scopeName = entry.getKey().toUpperCase();
+                        String variableNameUpperCase = variableName.toUpperCase();
                         addDebug(consumer, variableValue, scopeName, variableNameUpperCase);
                     });
                 })
@@ -405,31 +425,28 @@ public class Main extends Application {
 
     private void showScene(Stage stage, Parent root) {
         Scene scene = new Scene(root);
-        scene.setOnKeyPressed(x -> {
-            switch (x.getCode()) {
+        scene.setOnKeyPressed(keyEvent -> {
+            switch (keyEvent.getCode()) {
                 case F2 -> {
-                    if (x.isControlDown() && interpreter != null) {
+                    if (keyEvent.isControlDown() && interpreter != null) {
                         interpreter.stop();
                     }
                 }
-                case F9 -> runButton.fire();
+                case F5 -> {
+                    int currentParagraph = codeArea.getCurrentParagraph();
+                    handleBreakpointChange(currentParagraph);
+                }
+                case F9 -> handleStartOrContinue();
                 case F8 -> {
-                    switch (interpreter.state()) {
-                        case InterpreterState.PausedDebug _ -> {
-                            interpreter.step();
-                        }
-                        case InterpreterState.NotStarted _, InterpreterState.ForcedStop _, InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _ -> {
-                            breakpointLines.addLast(1);
-                            runButton.fire();
-                        }
-                        case InterpreterState.Running _ -> {
-                        }
-                    }
+                    handleStep();
                 }
                 case ESCAPE -> {
                     switch (interpreter.state()) {
-                        case InterpreterState.ForcedStop _, InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _ -> dosWindow.hide();
-                        case InterpreterState.PausedDebug _, InterpreterState.NotStarted _, InterpreterState.Running _ -> {}
+                        case InterpreterState.ForcedStop _, InterpreterState.CompletedExceptionally _,
+                             InterpreterState.CompletedSuccessfully _ -> dosWindow.hide();
+                        case InterpreterState.PausedDebug _, InterpreterState.NotStarted _,
+                             InterpreterState.Running _ -> {
+                        }
                     }
                 }
                 default -> {
@@ -440,6 +457,47 @@ public class Main extends Application {
         stage.setTitle("JVisualG");
         stage.setScene(scene);
         stage.show();
+    }
+
+    private void handleBreakpointChange(int currentParagraph) {
+        if (breakpointLines.contains(currentParagraph)) {
+            breakpointLines.remove((Integer) currentParagraph);
+            interpreter.removeBreakpoint(currentParagraph + 1);
+        } else {
+            breakpointLines.add(currentParagraph);
+            interpreter.addBreakpoint(currentParagraph + 1);
+        }
+        codeArea.recreateParagraphGraphic(currentParagraph);
+    }
+
+    private void handleStartOrContinue() {
+        switch (interpreter.state()) {
+            case InterpreterState.PausedDebug _ -> {
+                interpreter.continueExecution();
+            }
+            case InterpreterState.NotStarted _, InterpreterState.ForcedStop _,
+                 InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _ -> {
+                resetExecution();
+                Thread.startVirtualThread(() -> startExecution(InterpreterState.Running.INSTANCE));
+            }
+            case InterpreterState.Running _ -> {
+            }
+        }
+    }
+
+    private void handleStep() {
+        switch (interpreter.state()) {
+            case InterpreterState.PausedDebug _ -> {
+                interpreter.step();
+            }
+            case InterpreterState.NotStarted _, InterpreterState.ForcedStop _,
+                 InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _ -> {
+                resetExecution();
+                Thread.startVirtualThread(() -> startExecution(new InterpreterState.PausedDebug(1)));
+            }
+            case InterpreterState.Running _ -> {
+            }
+        }
     }
 
     private void setupDefaultText() {
@@ -505,20 +563,60 @@ public class Main extends Application {
     private void handlePopupError(MouseOverTextEvent e, Label popupMsg, Popup popup) {
         int chIdx = e.getCharacterIndex();
         Point2D pos = e.getScreenPosition();
-        if (codeArea.getText().isEmpty() || diagnostics == null)
+
+        if (codeArea.getText().isEmpty()) {
             return;
-        diagnostics.stream()
-                .filter(diagnostic -> {
-                    int start = toOffset(codeArea.getText(), diagnostic.getRange().getStart());
-                    int end = toOffset(codeArea.getText(), diagnostic.getRange().getEnd());
-                    return chIdx >= start && chIdx <= end;
-                })
-                .findFirst().ifPresent(diagnostic -> {
-                    popupMsg.setText(diagnostic.getMessage());
-                    popup.show(codeArea, pos.getX(), pos.getY() + 10);
-                });
+        }
+        if (interpreter.state() instanceof InterpreterState.PausedDebug) {
+            BreakIterator wordIterator = BreakIterator.getWordInstance(Locale.getDefault());
+            Optional<DebugState> first = tryGetValue(wordIterator, chIdx).or(() -> tryGetValue(BreakIterator.getLineInstance(), chIdx));
+            if (first.isEmpty()) {
+                return;
+            }
+            DebugState debugState = first.get();
+            popupMsg.setText(debugState.getNome + " = " + debugState.getValor());
+            popup.show(codeArea, pos.getX(), pos.getY() + 10);
+        }
+        if (diagnostics == null) {
+            diagnostics.stream()
+                    .filter(diagnostic -> {
+                        int start = toOffset(codeArea.getText(), diagnostic.getRange().getStart());
+                        int end = toOffset(codeArea.getText(), diagnostic.getRange().getEnd());
+                        return chIdx >= start && chIdx <= end;
+                    })
+                    .findFirst().ifPresent(diagnostic -> {
+                        popupMsg.setText(diagnostic.getMessage());
+                        popup.show(codeArea, pos.getX(), pos.getY() + 10);
+                    });
+        }
     }
 
+    private Optional<DebugState> tryGetValue(BreakIterator wordIterator, int chIdx) {
+        wordIterator.setText(codeArea.getText());
+
+        int start = wordIterator.preceding(chIdx);
+        int end = wordIterator.following(chIdx);
+
+        if (start == BreakIterator.DONE || end == BreakIterator.DONE) {
+            return Optional.empty();
+        }
+
+        String originalText = codeArea.getText(start, wordIterator.next());
+        String text = originalText.strip().replaceAll("[().,+-/%^*]", "");
+        Optional<DebugState> first = debugArea.getItems().stream().filter(x -> x.getNome().equalsIgnoreCase(text)).findFirst();
+        if (first.isEmpty()) {
+            Matcher matcher = ARRAY_REGEX.matcher(text);
+            if (matcher.find()) {
+                String indice = matcher.group(1);
+                return debugArea.getItems().stream().filter(x -> x.getNome().equalsIgnoreCase(indice))
+                    .findFirst()
+                    .map(DebugState::getValor).or(() -> Optional.of(indice))
+                .flatMap(index -> debugArea.getItems().stream().filter(x -> x.getNome().equalsIgnoreCase(text.replace(indice, index) )).findFirst());
+            }
+        }
+        return first;
+    }
+    private static Pattern ARRAY_REGEX = Pattern.compile("\\w\\[(\\d|\\w)]");
 
     class VisualgLanguageClient implements LanguageClient {
 

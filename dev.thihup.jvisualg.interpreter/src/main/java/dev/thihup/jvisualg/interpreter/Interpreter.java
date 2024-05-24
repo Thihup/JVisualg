@@ -15,8 +15,11 @@ import java.lang.reflect.Array;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 
@@ -38,6 +41,7 @@ public class Interpreter {
     private volatile InterpreterState state = InterpreterState.NotStarted.INSTANCE;
     private InputState inputState;
     private boolean eco = false;
+    private TreeMap<Integer, Node> lineToAstNode;
 
 
     public Interpreter(IO io, @Nullable Consumer<ProgramState> debuggerCallback) {
@@ -55,6 +59,10 @@ public class Interpreter {
         this.breakpoints.add(location);
     }
 
+    public void removeBreakpoint(int location) {
+        this.breakpoints.remove((Integer) location);
+    }
+
     public void reset() {
         stack.clear();
         functions.clear();
@@ -68,45 +76,66 @@ public class Interpreter {
         return state;
     }
 
-    public CompletableFuture<Void> run(String code, ExecutorService executorService) {
-        return CompletableFuture.runAsync(() -> {
-            state = InterpreterState.Running.INSTANCE;
-            ASTResult parse = VisualgParser.parse(code);
-            parse.node()
-                    .ifPresentOrElse(this::run, () -> {
-                        throw new RuntimeException("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n")));
-                    });
+    public void run(String code) {
+        runWithState(code, InterpreterState.Running.INSTANCE);
+    }
 
-        }, executorService).whenComplete((_, exception) -> {
+    public void runWithState(String code, InterpreterState state) {
+        try {
+            this.state = state;
+            ASTResult parse = VisualgParser.parse(code);
+            Optional<Node> optionalNode = parse.node();
+            if (optionalNode.isPresent()) {
+                Node node = optionalNode.get();
+                lineToAstNode = node.visitChildren()
+                        .collect(Collectors.toMap(node2 -> node2.location().orElse(Location.EMPTY).startLine(),
+                        Function.identity(), (_, b) -> b, TreeMap::new));
+
+                this.run(node);
+            } else {
+                failParsing(parse);
+            }
+            this.state = InterpreterState.CompletedSuccessfully.INSTANCE;
+        } catch (Exception exception) {
+            this.state = new InterpreterState.CompletedExceptionally(exception);
+        } finally {
             if (debuggerCallback != null) {
                 debuggerCallback.accept(new ProgramState(0, stack));
             }
+        }
+    }
 
-            state = exception != null ? new InterpreterState.CompletedExceptionally(exception) : InterpreterState.CompletedSuccessfully.INSTANCE;
-        });
+    private static void failParsing(ASTResult parse) {
+        throw new RuntimeException("Error parsing code: " + parse.errors().stream().map(x -> x.location() + ":" + x.message()).collect(Collectors.joining("\n")));
     }
 
     private void run(Node node) {
         try {
+            int currentLineNumber = node.location().orElse(Location.EMPTY).startLine();
             switch (state) {
                 case InterpreterState.ForcedStop _ -> throw new CancellationException("Program was cancelled");
                 case InterpreterState.CompletedSuccessfully _ -> {
                     return;
                 }
-                case InterpreterState.PausedDebug _ -> handleDebugCommand(node);
-
-                case InterpreterState.CompletedExceptionally _, InterpreterState.Running _,
+                case InterpreterState.PausedDebug(int lineNumber)
+                    when lineToAstNode.containsKey(lineNumber) && currentLineNumber == lineNumber -> handleDebugCommand(node);
+                case InterpreterState.PausedDebug e -> {
+                    handleDebugCommand(node);
+                    setNextLineDebug(e);
+                }
+                case InterpreterState.CompletedExceptionally _,
                      InterpreterState.NotStarted _ -> {
+                }
+                case InterpreterState.Running _ when  breakpoints.contains(currentLineNumber)
+                        && lineToAstNode.containsKey(currentLineNumber) -> {
+                    state = new InterpreterState.PausedDebug(currentLineNumber);
+                    handleDebugCommand(node);
+                }
+                case InterpreterState.Running _ -> {
                 }
 
             }
 
-            int lineNumber = node.location().orElse(Location.EMPTY).startLine();
-            if (!(state instanceof InterpreterState.PausedDebug) && breakpoints.contains(lineNumber) &&
-                    !(node instanceof Node.CompundNode<?>)) {
-                state = new InterpreterState.PausedDebug(lineNumber);
-                handleDebugCommand(node);
-            }
 
             switch (node) {
                 case Node.AlgoritimoNode algoritimoNode -> runAlgoritmo(algoritimoNode);
@@ -159,14 +188,22 @@ public class Interpreter {
 
     public void step() {
         try {
-            if (state instanceof InterpreterState.PausedDebug) {
+            if (state instanceof InterpreterState.PausedDebug e) {
                 if (lock.getNumberWaiting() == 1) {
                     lock.await();
+                    setNextLineDebug(e);
+
                 }
             }
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void setNextLineDebug(InterpreterState.PausedDebug e) {
+        state = Optional.ofNullable(lineToAstNode.higherKey(e.lineNumber()))
+            .<InterpreterState>map(InterpreterState.PausedDebug::new)
+            .orElse(InterpreterState.Running.INSTANCE);
     }
 
     public void continueExecution() {
@@ -609,7 +646,8 @@ public class Interpreter {
             case Node.EmptyExpressionNode _ -> 0;
             case Node.ArrayAccessNode arrayAccessNode -> evaluateArrayAccessNode(arrayAccessNode);
             case Node.MemberAccessNode memberAccessNode -> evaluateMemberAccessNode(memberAccessNode);
-            case Node.RangeNode _ -> throw new UnsupportedOperationException("RangeNode not implemented");        };
+            case Node.RangeNode _ -> throw new UnsupportedOperationException("RangeNode not implemented");
+        };
 
     }
 
@@ -986,7 +1024,7 @@ public class Interpreter {
         stack.reversed().values().stream().filter(m -> m.containsKey(name)).findFirst().ifPresentOrElse(m -> {
             m.put(name, switch (context) {
                 case ARGUMENT -> assignArgument(value, m.get(name).getClass());
-                case SIMPLE ->  assignSimple(value, m.get(name).getClass());
+                case SIMPLE -> assignSimple(value, m.get(name).getClass());
             });
         }, () -> {
             throw new TypeException.VariableNotFound(name);
