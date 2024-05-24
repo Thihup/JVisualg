@@ -12,9 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
 import java.util.stream.Stream;
 
@@ -92,7 +89,7 @@ class InterpreterTest extends ExamplesBase {
                         escreval(falso)
                         escreval(a)
                         fimalgoritmo
-                        """, Executors.newVirtualThreadPerTaskExecutor()).join();
+                        """);
         assertEquals(
                 """
                         Hello, World! 5
@@ -460,7 +457,7 @@ class InterpreterTest extends ExamplesBase {
                     leia(a)
                     escreval(a)
                 fimalgoritmo
-                """, Executors.newVirtualThreadPerTaskExecutor()).join();
+                """);
 
         assertEquals(
                 """
@@ -492,7 +489,7 @@ class InterpreterTest extends ExamplesBase {
 
         Interpreter interpreter = new Interpreter(io);
 
-        interpreter.run(Files.readString(path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor()).get(10, TimeUnit.SECONDS);
+        interpreter.run(Files.readString(path, StandardCharsets.ISO_8859_1));
 
         System.out.println(stringBuilder);
     }
@@ -529,13 +526,11 @@ class InterpreterTest extends ExamplesBase {
 
         Interpreter interpreter = new Interpreter(io);
 
-        CompletableFuture<Void> run = interpreter.run(Files.readString(file.path, StandardCharsets.ISO_8859_1), Executors.newVirtualThreadPerTaskExecutor());
-        try {
-            run.join();
-            fail();
-        } catch (CompletionException e) {
-            System.out.println(stringBuilder);
-            assertInstanceOf(file.e, e.getCause());
+        interpreter.run(Files.readString(file.path, StandardCharsets.ISO_8859_1));
+        System.out.println(stringBuilder);
+        switch (interpreter.state()) {
+            case InterpreterState.CompletedExceptionally(Throwable e) -> assertInstanceOf(file.e, e);
+            default -> fail();
         }
 
     }
@@ -571,12 +566,12 @@ class InterpreterTest extends ExamplesBase {
                 fimalgoritmo
                 """;
 
-        CompletableFuture<Void> run = interpreter.run(program.formatted(type1, type2, operand), Executors.newVirtualThreadPerTaskExecutor());
-        try {
-            run.join();
-        } catch (CompletionException e) {
-            System.out.println(stringBuilder);
-            assertInstanceOf(TypeException.InvalidOperand.class, e.getCause());
+        interpreter.run(program.formatted(type1, type2, operand));
+        System.out.println(stringBuilder);
+        switch (interpreter.state()) {
+            case InterpreterState.CompletedSuccessfully _ -> {}
+            case InterpreterState.CompletedExceptionally(Throwable e) -> assertInstanceOf(TypeException.InvalidOperand.class, e);
+            default -> fail();
         }
 
     }
@@ -606,12 +601,12 @@ class InterpreterTest extends ExamplesBase {
                 fimalgoritmo
                 """;
 
-        CompletableFuture<Void> run = interpreter.run(program.formatted(type, operand), Executors.newVirtualThreadPerTaskExecutor());
-        try {
-            run.join();
-        } catch (CompletionException e) {
-            System.out.println(stringBuilder);
-            assertInstanceOf(TypeException.InvalidOperand.class, e.getCause());
+        interpreter.run(program.formatted(type, operand));
+        System.out.println(stringBuilder);
+        switch (interpreter.state()) {
+            case InterpreterState.CompletedSuccessfully _ -> {}
+            case InterpreterState.CompletedExceptionally(Throwable e) -> assertInstanceOf(TypeException.InvalidOperand.class, e);
+            default -> fail();
         }
 
     }
