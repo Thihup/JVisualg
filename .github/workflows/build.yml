@@ -31,7 +31,6 @@ jobs:
       - name: Example step using Maven plugin
         run: |
           cd dev.thihup.jvisualg.ide
-          mvn --no-transfer-progress -Pnative -DautoClose=true gluonfx:runagent
           mvn --no-transfer-progress -Pnative gluonfx:build
       - name: Release
         uses: ncipollo/release-action@v1
