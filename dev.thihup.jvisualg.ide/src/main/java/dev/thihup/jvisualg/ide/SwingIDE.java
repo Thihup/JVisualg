@@ -23,6 +23,8 @@ import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.print.PrinterException;
 import java.io.IOException;
 import java.time.LocalDate;
@@ -55,10 +57,18 @@ public class SwingIDE extends JFrame {
     public SwingIDE() {
         FlatLightLaf.setup();
 
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+
         dosContent.setBackground(Color.BLACK);
         dosContent.setForeground(Color.WHITE);
         dosContent.setFont(Font.getFont(Font.MONOSPACED));
         dosWindow.add(dosContent);
+        dosWindow.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                dosWindow.setVisible(false);
+            }
+        });
 
         interpreter = new Interpreter(new IO(this::readVariable, this::handleOutputEvent), programState -> {
             SwingUtilities.invokeLater(() -> {
