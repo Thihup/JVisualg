@@ -32,10 +32,14 @@ jobs:
         run: |
           cd dev.thihup.jvisualg.ide
           mvn --no-transfer-progress -Pnative package
+      - name: Compress
+        run: |
+          Get-ChildItem -Path dev.thihup.jvisualg.ide/target/*.dll, dev.thihup.jvisualg.ide/target/JVisualG.exe |
+            Compress-Archive -DestinationPath dev.thihup.jvisualg.ide/target/JVisualG.zip
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "dev.thihup.jvisualg.ide/target/JVisualG.exe"
+          artifacts: "dev.thihup.jvisualg.ide/target/JVisualG.zip"
           replacesArtifacts: true
           tag: JVisualg
           token: ${{ secrets.GITHUB_TOKEN }}
