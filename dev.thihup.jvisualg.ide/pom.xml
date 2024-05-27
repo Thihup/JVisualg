@@ -97,6 +97,7 @@
                                 <buildArg>-H:+ForeignAPISupport</buildArg>
                                 <buildArg>--features=dev.thihup.jvisualg.ide.NativeImageFeature</buildArg>
                                 <buildArg>-Ob</buildArg>
+                                <buildArg>-march=compatibility</buildArg>
                             </buildArgs>
                         </configuration>
                         <executions>
