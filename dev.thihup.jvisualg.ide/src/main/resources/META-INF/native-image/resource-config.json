@@ -13,6 +13,8 @@
   }, {
     "pattern":"\\QMETA-INF/services/java.util.spi.ResourceBundleControlProvider\\E"
   }, {
+    "pattern":"\\QMETA-INF/services/javax.print.PrintServiceLookup\\E"
+  }, {
     "pattern":"\\QMETA-INF/services/javax.xml.parsers.SAXParserFactory\\E"
   }, {
     "pattern":"\\Qcom/formdev/flatlaf/FlatLaf.properties\\E"
@@ -32,6 +34,12 @@
     "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/RSyntaxTextArea_pt.properties\\E"
   }, {
     "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/RSyntaxTextArea_pt_BR.properties\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/focusabletip/FocusableTip.properties\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/focusabletip/FocusableTip_pt.properties\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/focusabletip/FocusableTip_pt_BR.properties\\E"
   }, {
     "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/dark.xml\\E"
   }, {
@@ -55,7 +63,11 @@
   }, {
     "pattern":"\\Qorg/fife/ui/rtextarea/RTextArea_pt_BR.properties\\E"
   }, {
+    "pattern":"java.base:\\Qjava/util/currency.data\\E"
+  }, {
     "pattern":"java.base:\\Qjdk/internal/icu/impl/data/icudt74b/ubidi.icu\\E"
+  }, {
+    "pattern":"java.datatransfer:\\Qsun/datatransfer/resources/flavormap.properties\\E"
   }, {
     "pattern":"java.desktop:\\Qcom/formdev/flatlaf/resources/Bundle.properties\\E"
   }, {
@@ -69,9 +81,29 @@
   }, {
     "pattern":"java.desktop:\\Qjavax/swing/text/html/default.css\\E"
   }, {
+    "pattern":"java.desktop:\\Qjavax/swing/text/html/parser/html32.bdtd\\E"
+  }, {
     "pattern":"java.desktop:\\Qsun/awt/resources/awt_pt.properties\\E"
   }, {
     "pattern":"java.desktop:\\Qsun/awt/resources/awt_pt_BR.properties\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/duplex.png\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/oneside.png\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/orientLandscape.png\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/orientPortrait.png\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/orientRevLandscape.png\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/orientRevPortrait.png\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/serviceui_pt.properties\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/serviceui_pt_BR.properties\\E"
+  }, {
+    "pattern":"java.desktop:\\Qsun/print/resources/tumble.png\\E"
   }, {
     "pattern":"java.xml:\\Qjdk/xml/internal/jdkcatalog/JDKCatalog.xml\\E"
   }]},
@@ -88,13 +120,22 @@
     "name":"org.fife.ui.rsyntaxtextarea.RSyntaxTextArea",
     "locales":["pt-BR"]
   }, {
+    "name":"org.fife.ui.rsyntaxtextarea.focusabletip.FocusableTip",
+    "locales":["pt-BR"]
+  }, {
     "name":"org.fife.ui.rtextarea.RTextArea",
     "locales":["pt-BR"]
   }, {
     "name":"sun.awt.resources.awt",
     "locales":["pt-BR"]
   }, {
+    "name":"sun.print.resources.serviceui",
+    "locales":["pt-BR"]
+  }, {
     "name":"sun.text.resources.cldr.FormatData",
-    "locales":["en", "en-US", "und"]
+    "locales":["en", "en-US", "pt", "pt-BR", "und"]
+  }, {
+    "name":"sun.util.resources.cldr.CurrencyNames",
+    "locales":["pt", "pt-BR", "und"]
   }]
 }

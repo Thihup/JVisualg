@@ -591,10 +591,6 @@ public class SwingIDE extends JFrame {
                 .forEach(debugTable::addRow);
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new SwingIDE().setVisible(true));
-    }
-
     private static class TypeChecker extends AbstractParser {
         @Override
         public ParseResult parse(RSyntaxDocument doc, String style) {

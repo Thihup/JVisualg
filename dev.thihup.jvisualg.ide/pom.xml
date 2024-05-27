@@ -14,19 +14,13 @@
     <name>JVisualG</name>
 
     <properties>
-        <mainClass>dev.thihup.jvisualg.ide.SwingIDE</mainClass>
-        <native.maven.plugin.version>0.9.12</native.maven.plugin.version>
+        <mainClass>dev.thihup.jvisualg.ide.Main</mainClass>
         <imageName>JVisualG</imageName>
         <autoClose>false</autoClose>
         <graalvm.version>24.0.1</graalvm.version>
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>dev.thihup.jvisualg</groupId>
-            <artifactId>dev.thihup.jvisualg.lsp</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>dev.thihup.jvisualg</groupId>
             <artifactId>dev.thihup.jvisualg.interpreter</artifactId>
@@ -51,17 +45,6 @@
             <groupId>de.tisoft.rsyntaxtextarea</groupId>
             <artifactId>rsyntaxtextarea-antlr4-extension</artifactId>
             <version>0.0.3</version>
-        </dependency>
-        <dependency>
-            <groupId>org.graalvm.sdk</groupId>
-            <artifactId>graal-sdk</artifactId>
-            <version>${graalvm.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.graalvm.nativeimage</groupId>
-            <artifactId>svm</artifactId>
-            <version>${graalvm.version}</version>
-            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -96,6 +79,9 @@
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-H:+ForeignAPISupport</buildArg>
                                 <buildArg>-Dsun.font.layout.ffm=false</buildArg>
+                                <argument>-Duser.language=pt</argument>
+                                <argument>-Duser.country=BR</argument>
+                                <argument>-H:IncludeLocales=pt,en</argument>
                             </buildArgs>
                         </configuration>
                         <executions>
@@ -117,6 +103,8 @@
                             <workingDirectory>${project.build.directory}</workingDirectory>
                             <arguments>
                                 <argument>-Dsun.font.layout.ffm=false</argument>
+                                <argument>-Duser.language=pt</argument>
+                                <argument>-Duser.country=BR</argument>
                                 <argument>-classpath</argument>
                                 <classpath/>
                                 <argument>${mainClass}</argument>

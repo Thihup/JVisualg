@@ -34,8 +34,11 @@ jobs:
           mvn --no-transfer-progress -Pnative package
       - name: Compress
         run: |
+          mkdir dev.thihup.jvisualg.ide/target/lib
+          copy $env:JAVA_HOME/lib/fontconfig.bfc dev.thihup.jvisualg.ide/target/lib
           Get-ChildItem -Path dev.thihup.jvisualg.ide/target/*.dll, dev.thihup.jvisualg.ide/target/JVisualG.exe |
             Compress-Archive -DestinationPath dev.thihup.jvisualg.ide/target/JVisualG.zip
+          Compress-Archive -Path dev.thihup.jvisualg.ide/target/lib -DestinationPath dev.thihup.jvisualg.ide/target/JVisualG.zip -Update
       - name: Release
         uses: ncipollo/release-action@v1
         with:

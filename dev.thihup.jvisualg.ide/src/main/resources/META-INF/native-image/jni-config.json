@@ -1,5 +1,8 @@
 [
 {
+  "name":"[Ljava.lang.String;"
+},
+{
   "name":"[Ljava.util.Locale;"
 },
 {
@@ -14,10 +17,6 @@
 },
 {
   "name":"com.sun.java.swing.plaf.windows.WindowsPopupWindow"
-},
-{
-  "name":"dev.thihup.jvisualg.ide.SwingIDE",
-  "methods":[{"name":"main","parameterTypes":["java.lang.String[]"] }]
 },
 {
   "name":"java.awt.AWTEvent",
@@ -125,6 +124,10 @@
   "methods":[{"name":"<init>","parameterTypes":["java.awt.Component","int","long","int","int","int","int","int","int","boolean","int"] }]
 },
 {
+  "name":"java.awt.event.MouseWheelEvent",
+  "methods":[{"name":"<init>","parameterTypes":["java.awt.Component","int","long","int","int","int","int","int","int","boolean","int","int","int","double"] }]
+},
+{
   "name":"java.awt.geom.AffineTransform",
   "fields":[{"name":"m00"}, {"name":"m01"}, {"name":"m02"}, {"name":"m10"}, {"name":"m11"}, {"name":"m12"}]
 },
@@ -180,6 +183,14 @@
 {
   "name":"java.awt.image.SinglePixelPackedSampleModel",
   "fields":[{"name":"bitMasks"}, {"name":"bitOffsets"}, {"name":"bitSizes"}, {"name":"maxBitSize"}]
+},
+{
+  "name":"java.awt.print.PageFormat",
+  "methods":[{"name":"getPaper","parameterTypes":[] }, {"name":"setOrientation","parameterTypes":["int"] }, {"name":"setPaper","parameterTypes":["java.awt.print.Paper"] }]
+},
+{
+  "name":"java.awt.print.Paper",
+  "methods":[{"name":"setImageableArea","parameterTypes":["double","double","double","double"] }, {"name":"setSize","parameterTypes":["double","double"] }]
 },
 {
   "name":"java.lang.Boolean",
@@ -272,6 +283,10 @@
   "methods":[{"name":"<init>","parameterTypes":["long"] }]
 },
 {
+  "name":"sun.awt.image.ImageRepresentation",
+  "fields":[{"name":"numSrcLUT"}, {"name":"srcLUTtransIndex"}]
+},
+{
   "name":"sun.awt.image.IntegerComponentRaster",
   "fields":[{"name":"data"}, {"name":"dataOffsets"}, {"name":"pixelStride"}, {"name":"scanlineStride"}, {"name":"type"}]
 },
@@ -293,9 +308,13 @@
   "methods":[{"name":"setIShellFolder","parameterTypes":["long"] }, {"name":"setRelativePIDL","parameterTypes":["long"] }]
 },
 {
+  "name":"sun.awt.windows.WClipboard",
+  "methods":[{"name":"lostSelectionOwnershipImpl","parameterTypes":[] }]
+},
+{
   "name":"sun.awt.windows.WComponentPeer",
   "fields":[{"name":"hwnd"}, {"name":"winGraphicsConfig"}],
-  "methods":[{"name":"disposeLater","parameterTypes":[] }, {"name":"handleExpose","parameterTypes":["int","int","int","int"] }, {"name":"postEvent","parameterTypes":["java.awt.AWTEvent"] }, {"name":"replaceSurfaceData","parameterTypes":[] }, {"name":"replaceSurfaceDataLater","parameterTypes":[] }]
+  "methods":[{"name":"disposeLater","parameterTypes":[] }, {"name":"dynamicallyLayoutContainer","parameterTypes":[] }, {"name":"handleExpose","parameterTypes":["int","int","int","int"] }, {"name":"postEvent","parameterTypes":["java.awt.AWTEvent"] }, {"name":"replaceSurfaceData","parameterTypes":[] }, {"name":"replaceSurfaceDataLater","parameterTypes":[] }]
 },
 {
   "name":"sun.awt.windows.WDesktopPeer",
@@ -329,6 +348,16 @@
 {
   "name":"sun.awt.windows.WPanelPeer",
   "fields":[{"name":"insets_"}]
+},
+{
+  "name":"sun.awt.windows.WPrintDialogPeer",
+  "fields":[{"name":"parent"}],
+  "methods":[{"name":"setHWnd","parameterTypes":["long"] }]
+},
+{
+  "name":"sun.awt.windows.WPrinterJob",
+  "fields":[{"name":"dialogOwnerPeer"}, {"name":"driverDoesCollation"}, {"name":"driverDoesMultipleCopies"}, {"name":"mPageHeight"}, {"name":"mPageWidth"}, {"name":"mPrintHeight"}, {"name":"mPrintPhysX"}, {"name":"mPrintPhysY"}, {"name":"mPrintWidth"}, {"name":"mPrintXRes"}, {"name":"mPrintYRes"}, {"name":"pjob"}, {"name":"userRequestedCollation"}],
+  "methods":[{"name":"getCollateAttrib","parameterTypes":[] }, {"name":"getColorAttrib","parameterTypes":[] }, {"name":"getCopiesAttrib","parameterTypes":[] }, {"name":"getDestAttrib","parameterTypes":[] }, {"name":"getDevMode","parameterTypes":[] }, {"name":"getDevNames","parameterTypes":[] }, {"name":"getMediaTrayAttrib","parameterTypes":[] }, {"name":"getOrientAttrib","parameterTypes":[] }, {"name":"getPrintDC","parameterTypes":[] }, {"name":"getPrintToFileEnabled","parameterTypes":[] }, {"name":"getPrinterAttrib","parameterTypes":[] }, {"name":"getQualityAttrib","parameterTypes":[] }, {"name":"getSidesAttrib","parameterTypes":[] }, {"name":"getWin32MediaAttrib","parameterTypes":[] }, {"name":"setDevMode","parameterTypes":["long"] }, {"name":"setDevNames","parameterTypes":["long"] }, {"name":"setJobAttributes","parameterTypes":["javax.print.attribute.PrintRequestAttributeSet","int","int","short","short","short","short","short","short","short"] }, {"name":"setMediaTrayAttrib","parameterTypes":["int"] }, {"name":"setNativeAttributes","parameterTypes":["int","int","int"] }, {"name":"setPrintDC","parameterTypes":["long"] }, {"name":"setPrinterNameAttrib","parameterTypes":["java.lang.String"] }, {"name":"setRangeCopiesAttribute","parameterTypes":["int","int","boolean","int"] }, {"name":"setResolutionDPI","parameterTypes":["int","int"] }, {"name":"setWin32MediaAttrib","parameterTypes":["int","int","int"] }]
 },
 {
   "name":"sun.awt.windows.WToolkit",
@@ -504,7 +533,19 @@
   "fields":[{"name":"curIndex"}, {"name":"numXbands"}, {"name":"region"}]
 },
 {
+  "name":"sun.java2d.pipe.ShapeSpanIterator",
+  "fields":[{"name":"pData"}]
+},
+{
   "name":"sun.java2d.windows.WindowsFlags",
   "fields":[{"name":"d3dEnabled"}, {"name":"d3dSet"}, {"name":"offscreenSharingEnabled"}, {"name":"setHighDPIAware"}]
+},
+{
+  "name":"sun.print.PrintServiceLookupProvider",
+  "methods":[{"name":"refreshServices","parameterTypes":[] }]
+},
+{
+  "name":"sun.print.RasterPrinterJob",
+  "methods":[{"name":"getCopies","parameterTypes":[] }, {"name":"getFromPageAttrib","parameterTypes":[] }, {"name":"getMaxPageAttrib","parameterTypes":[] }, {"name":"getMinPageAttrib","parameterTypes":[] }, {"name":"getParentWindowID","parameterTypes":[] }, {"name":"getSelectAttrib","parameterTypes":[] }, {"name":"getToPageAttrib","parameterTypes":[] }]
 }
 ]
