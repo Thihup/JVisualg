@@ -116,6 +116,7 @@
                             <executable>java</executable>
                             <workingDirectory>${project.build.directory}</workingDirectory>
                             <arguments>
+                                <argument>-Dsun.font.layout.ffm=false</argument>
                                 <argument>-classpath</argument>
                                 <classpath/>
                                 <argument>${mainClass}</argument>

@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: graalvm/setup-graalvm@v1
         with:
-          java-version: 'dev'
+          java-version: '22'
           distribution: 'graalvm'
           cache: 'maven'
           github-token: ${{ secrets.GITHUB_TOKEN }}
