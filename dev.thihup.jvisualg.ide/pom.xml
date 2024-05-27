@@ -75,13 +75,24 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>com.gluonhq</groupId>
-                        <artifactId>gluonfx-maven-plugin</artifactId>
-                        <version>1.0.22</version>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.10.2</version>
+                        <extensions>true</extensions>
                         <configuration>
-                            <mainClass>${mainClass}</mainClass>
-                            <enableSWRendering>true</enableSWRendering>
+                            <buildArgs>
+                                <buildArg>--no-fallback</buildArg>
+                            </buildArgs>
                         </configuration>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
