@@ -7,6 +7,7 @@ module dev.thihup.jvisualg.ide {
     requires org.antlr.antlr4.runtime;
     requires rsyntaxtextarea.antlr4.extension;
     requires java.desktop;
+    requires org.graalvm.nativeimage;
 
     exports dev.thihup.jvisualg.ide to org.fife.RSyntaxTextArea;
 }
