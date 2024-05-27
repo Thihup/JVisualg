@@ -1,22 +1,9 @@
 [
 {
-  "name":"[Ljava.lang.String;"
-},
-{
   "name":"[Ljava.util.Locale;"
 },
 {
-  "name":"[Lsun.awt.shell.ShellFolderColumnInfo;"
-},
-{
   "name":"[Lsun.java2d.loops.GraphicsPrimitive;"
-},
-{
-  "name":"com.formdev.flatlaf.ui.FlatWindowsNativeWindowBorder$WndProc",
-  "methods":[{"name":"fireStateChangedLaterOnce","parameterTypes":[] }, {"name":"isFullscreen","parameterTypes":[] }, {"name":"onNcHitTest","parameterTypes":["int","int","boolean"] }]
-},
-{
-  "name":"com.sun.java.swing.plaf.windows.WindowsPopupWindow"
 },
 {
   "name":"dev.thihup.jvisualg.ide.SwingIDE",
@@ -55,10 +42,6 @@
 {
   "name":"java.awt.Dimension",
   "fields":[{"name":"height"}, {"name":"width"}]
-},
-{
-  "name":"java.awt.Event",
-  "fields":[{"name":"target"}, {"name":"x"}, {"name":"y"}]
 },
 {
   "name":"java.awt.Font",
@@ -119,8 +102,7 @@
 },
 {
   "name":"java.awt.event.KeyEvent",
-  "fields":[{"name":"extendedKeyCode"}, {"name":"keyChar"}, {"name":"keyCode"}, {"name":"primaryLevelUnicode"}, {"name":"rawCode"}, {"name":"scancode"}],
-  "methods":[{"name":"<init>","parameterTypes":["java.awt.Component","int","long","int","int","char","int"] }]
+  "fields":[{"name":"extendedKeyCode"}, {"name":"keyChar"}, {"name":"keyCode"}, {"name":"primaryLevelUnicode"}, {"name":"rawCode"}, {"name":"scancode"}]
 },
 {
   "name":"java.awt.event.MouseEvent",
@@ -185,12 +167,8 @@
   "fields":[{"name":"bitMasks"}, {"name":"bitOffsets"}, {"name":"bitSizes"}, {"name":"maxBitSize"}]
 },
 {
-  "name":"java.awt.print.PageFormat",
-  "methods":[{"name":"getPaper","parameterTypes":[] }, {"name":"setOrientation","parameterTypes":["int"] }, {"name":"setPaper","parameterTypes":["java.awt.print.Paper"] }]
-},
-{
-  "name":"java.awt.print.Paper",
-  "methods":[{"name":"setImageableArea","parameterTypes":["double","double","double","double"] }, {"name":"setSize","parameterTypes":["double","double"] }]
+  "name":"java.lang.Boolean",
+  "methods":[{"name":"getBoolean","parameterTypes":["java.lang.String"] }]
 },
 {
   "name":"java.lang.Enum",
@@ -198,11 +176,7 @@
 },
 {
   "name":"java.lang.String",
-  "methods":[{"name":"concat","parameterTypes":["java.lang.String"] }, {"name":"toLowerCase","parameterTypes":["java.util.Locale"] }]
-},
-{
-  "name":"java.lang.System",
-  "methods":[{"name":"getProperty","parameterTypes":["java.lang.String"] }]
+  "methods":[{"name":"toLowerCase","parameterTypes":["java.util.Locale"] }]
 },
 {
   "name":"java.lang.Thread",
@@ -219,9 +193,6 @@
 {
   "name":"java.util.Locale",
   "methods":[{"name":"forLanguageTag","parameterTypes":["java.lang.String"] }]
-},
-{
-  "name":"javax.swing.Popup$HeavyWeightWindow"
 },
 {
   "name":"sun.awt.AWTAutoShutdown",
@@ -279,10 +250,6 @@
   "methods":[{"name":"<init>","parameterTypes":["long"] }]
 },
 {
-  "name":"sun.awt.image.ImageRepresentation",
-  "fields":[{"name":"numSrcLUT"}, {"name":"srcLUTtransIndex"}]
-},
-{
   "name":"sun.awt.image.IntegerComponentRaster",
   "fields":[{"name":"data"}, {"name":"dataOffsets"}, {"name":"pixelStride"}, {"name":"scanlineStride"}, {"name":"type"}]
 },
@@ -293,19 +260,6 @@
 {
   "name":"sun.awt.image.VolatileSurfaceManager",
   "fields":[{"name":"sdCurrent"}]
-},
-{
-  "name":"sun.awt.shell.ShellFolderColumnInfo",
-  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","int","int","boolean"] }]
-},
-{
-  "name":"sun.awt.shell.Win32ShellFolder2",
-  "fields":[{"name":"FDATE"}, {"name":"FNAME"}, {"name":"FSIZE"}, {"name":"FTYPE"}, {"name":"displayName"}, {"name":"folderType"}, {"name":"pIShellIcon"}],
-  "methods":[{"name":"setIShellFolder","parameterTypes":["long"] }, {"name":"setRelativePIDL","parameterTypes":["long"] }]
-},
-{
-  "name":"sun.awt.windows.WClipboard",
-  "methods":[{"name":"lostSelectionOwnershipImpl","parameterTypes":[] }]
 },
 {
   "name":"sun.awt.windows.WComponentPeer",
@@ -320,9 +274,6 @@
   "name":"sun.awt.windows.WDesktopProperties",
   "fields":[{"name":"pData"}],
   "methods":[{"name":"setBooleanProperty","parameterTypes":["java.lang.String","boolean"] }, {"name":"setColorProperty","parameterTypes":["java.lang.String","int","int","int"] }, {"name":"setFontProperty","parameterTypes":["java.lang.String","java.lang.String","int","int"] }, {"name":"setIntegerProperty","parameterTypes":["java.lang.String","int"] }, {"name":"setSoundProperty","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"setStringProperty","parameterTypes":["java.lang.String","java.lang.String"] }]
-},
-{
-  "name":"sun.awt.windows.WDialogPeer"
 },
 {
   "name":"sun.awt.windows.WFontPeer",
@@ -346,23 +297,13 @@
   "fields":[{"name":"insets_"}]
 },
 {
-  "name":"sun.awt.windows.WPrintDialogPeer",
-  "fields":[{"name":"parent"}],
-  "methods":[{"name":"setHWnd","parameterTypes":["long"] }]
-},
-{
-  "name":"sun.awt.windows.WPrinterJob",
-  "fields":[{"name":"dialogOwnerPeer"}, {"name":"driverDoesCollation"}, {"name":"driverDoesMultipleCopies"}, {"name":"mPageHeight"}, {"name":"mPageWidth"}, {"name":"mPrintHeight"}, {"name":"mPrintPhysX"}, {"name":"mPrintPhysY"}, {"name":"mPrintWidth"}, {"name":"mPrintXRes"}, {"name":"mPrintYRes"}, {"name":"pjob"}, {"name":"userRequestedCollation"}],
-  "methods":[{"name":"getCollateAttrib","parameterTypes":[] }, {"name":"getColorAttrib","parameterTypes":[] }, {"name":"getCopiesAttrib","parameterTypes":[] }, {"name":"getDestAttrib","parameterTypes":[] }, {"name":"getDevMode","parameterTypes":[] }, {"name":"getDevNames","parameterTypes":[] }, {"name":"getMediaTrayAttrib","parameterTypes":[] }, {"name":"getOrientAttrib","parameterTypes":[] }, {"name":"getPrintDC","parameterTypes":[] }, {"name":"getPrintToFileEnabled","parameterTypes":[] }, {"name":"getPrinterAttrib","parameterTypes":[] }, {"name":"getQualityAttrib","parameterTypes":[] }, {"name":"getSidesAttrib","parameterTypes":[] }, {"name":"getWin32MediaAttrib","parameterTypes":[] }, {"name":"setDevMode","parameterTypes":["long"] }, {"name":"setDevNames","parameterTypes":["long"] }, {"name":"setJobAttributes","parameterTypes":["javax.print.attribute.PrintRequestAttributeSet","int","int","short","short","short","short","short","short","short"] }, {"name":"setMediaTrayAttrib","parameterTypes":["int"] }, {"name":"setNativeAttributes","parameterTypes":["int","int","int"] }, {"name":"setPrintDC","parameterTypes":["long"] }, {"name":"setPrinterNameAttrib","parameterTypes":["java.lang.String"] }, {"name":"setRangeCopiesAttribute","parameterTypes":["int","int","boolean","int"] }, {"name":"setResolutionDPI","parameterTypes":["int","int"] }, {"name":"setWin32MediaAttrib","parameterTypes":["int","int","int"] }]
-},
-{
   "name":"sun.awt.windows.WToolkit",
   "methods":[{"name":"displayChanged","parameterTypes":[] }, {"name":"paletteChanged","parameterTypes":[] }, {"name":"windowsSettingChange","parameterTypes":[] }]
 },
 {
   "name":"sun.awt.windows.WWindowPeer",
   "fields":[{"name":"windowType"}],
-  "methods":[{"name":"draggedToNewScreen","parameterTypes":[] }, {"name":"getActiveWindowHandles","parameterTypes":["java.awt.Component"] }, {"name":"notifyWindowStateChanged","parameterTypes":["int","int"] }, {"name":"setBackground","parameterTypes":["java.awt.Color"] }]
+  "methods":[{"name":"draggedToNewScreen","parameterTypes":[] }, {"name":"notifyWindowStateChanged","parameterTypes":["int","int"] }, {"name":"setBackground","parameterTypes":["java.awt.Color"] }]
 },
 {
   "name":"sun.font.CharToGlyphMapper",
@@ -524,19 +465,7 @@
   "fields":[{"name":"curIndex"}, {"name":"numXbands"}, {"name":"region"}]
 },
 {
-  "name":"sun.java2d.pipe.ShapeSpanIterator",
-  "fields":[{"name":"pData"}]
-},
-{
   "name":"sun.java2d.windows.WindowsFlags",
   "fields":[{"name":"d3dEnabled"}, {"name":"d3dSet"}, {"name":"offscreenSharingEnabled"}, {"name":"setHighDPIAware"}]
-},
-{
-  "name":"sun.print.PrintServiceLookupProvider",
-  "methods":[{"name":"refreshServices","parameterTypes":[] }]
-},
-{
-  "name":"sun.print.RasterPrinterJob",
-  "methods":[{"name":"getCopies","parameterTypes":[] }, {"name":"getFromPageAttrib","parameterTypes":[] }, {"name":"getMaxPageAttrib","parameterTypes":[] }, {"name":"getMinPageAttrib","parameterTypes":[] }, {"name":"getParentWindowID","parameterTypes":[] }, {"name":"getSelectAttrib","parameterTypes":[] }, {"name":"getToPageAttrib","parameterTypes":[] }]
 }
 ]
