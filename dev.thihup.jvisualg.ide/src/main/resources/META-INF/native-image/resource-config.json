@@ -13,9 +13,13 @@
   }, {
     "pattern":"\\QMETA-INF/services/java.util.spi.ResourceBundleControlProvider\\E"
   }, {
+    "pattern":"\\QMETA-INF/services/javax.xml.parsers.SAXParserFactory\\E"
+  }, {
     "pattern":"\\Qcom/formdev/flatlaf/FlatLaf.properties\\E"
   }, {
     "pattern":"\\Qcom/formdev/flatlaf/FlatLightLaf.properties\\E"
+  }, {
+    "pattern":"\\Qcom/formdev/flatlaf/natives/flatlaf-windows-x86_64.dll\\E"
   }, {
     "pattern":"\\Qcom/formdev/flatlaf/resources/Bundle.properties\\E"
   }, {
@@ -28,6 +32,22 @@
     "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/RSyntaxTextArea_pt.properties\\E"
   }, {
     "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/RSyntaxTextArea_pt_BR.properties\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/dark.xml\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/default.xml\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/druid.xml\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/eclipse.xml\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/idea.xml\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/monokai.xml\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/theme.dtd\\E"
+  }, {
+    "pattern":"\\Qorg/fife/ui/rsyntaxtextarea/themes/vs.xml\\E"
   }, {
     "pattern":"\\Qorg/fife/ui/rtextarea/RTextArea.properties\\E"
   }, {
@@ -52,6 +72,8 @@
     "pattern":"java.desktop:\\Qsun/awt/resources/awt_pt.properties\\E"
   }, {
     "pattern":"java.desktop:\\Qsun/awt/resources/awt_pt_BR.properties\\E"
+  }, {
+    "pattern":"java.xml:\\Qjdk/xml/internal/jdkcatalog/JDKCatalog.xml\\E"
   }]},
   "bundles":[{
     "name":"com.formdev.flatlaf.resources.Bundle",
@@ -71,5 +93,8 @@
   }, {
     "name":"sun.awt.resources.awt",
     "locales":["pt-BR"]
+  }, {
+    "name":"sun.text.resources.cldr.FormatData",
+    "locales":["en", "en-US", "und"]
   }]
 }
