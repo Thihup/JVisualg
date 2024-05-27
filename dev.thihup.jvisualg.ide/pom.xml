@@ -96,6 +96,7 @@
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-H:+ForeignAPISupport</buildArg>
                                 <buildArg>--features=dev.thihup.jvisualg.ide.NativeImageFeature</buildArg>
+                                <buildArg>-Ob</buildArg>
                             </buildArgs>
                         </configuration>
                         <executions>
