@@ -82,6 +82,7 @@
                         <configuration>
                             <buildArgs>
                                 <buildArg>--no-fallback</buildArg>
+                                <buildArg>-H:+ForeignAPISupport</buildArg>
                             </buildArgs>
                         </configuration>
                         <executions>
