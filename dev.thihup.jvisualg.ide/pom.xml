@@ -95,9 +95,7 @@
                             <buildArgs>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-H:+ForeignAPISupport</buildArg>
-                                <buildArg>--features=dev.thihup.jvisualg.ide.NativeImageFeature</buildArg>
-                                <buildArg>-Ob</buildArg>
-                                <buildArg>-march=skylake-avx512</buildArg>
+                                <buildArg>-Dsun.font.layout.ffm=false</buildArg>
                             </buildArgs>
                         </configuration>
                         <executions>
