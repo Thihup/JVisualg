@@ -1,15 +1,12 @@
 module dev.thihup.jvisualg.ide {
-    requires javafx.fxml;
-    requires javafx.controls;
-    requires org.fxmisc.richtext;
-    requires reactfx;
     requires dev.thihup.jvisualg.lsp;
-    requires org.eclipse.lsp4j;
-    requires org.eclipse.lsp4j.jsonrpc;
     requires dev.thihup.jvisualg.interpreter;
-    requires org.jspecify;
+    requires org.fife.RSyntaxTextArea;
+    requires com.formdev.flatlaf;
+    requires dev.thihup.jvisualg.frontend;
+    requires org.antlr.antlr4.runtime;
+    requires rsyntaxtextarea.antlr4.extension;
+    requires java.desktop;
 
-    exports dev.thihup.jvisualg.ide to javafx.graphics;
-
-    opens dev.thihup.jvisualg.ide to javafx.fxml, javafx.base;
+    exports dev.thihup.jvisualg.ide to org.fife.RSyntaxTextArea;
 }

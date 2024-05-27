@@ -106,7 +106,7 @@ DOT : '.';
 ID : [a-z_][a-z0-9_]*;
 
 // Comments
-COMMENT : '//' ~[\r\n]* -> skip;
+COMMENT : '//' ~[\r\n]* -> channel(HIDDEN);
 
 // Whitespace
-WS : [ \t\r\n]+ -> skip;
+WS : [ \t\r\n]+ -> channel(HIDDEN);
