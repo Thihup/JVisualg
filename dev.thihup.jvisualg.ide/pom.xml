@@ -82,6 +82,7 @@
                         <configuration>
                             <buildArgs>
                                 <buildArg>--no-fallback</buildArg>
+                                <buildArg>--static</buildArg>
                             </buildArgs>
                         </configuration>
                         <executions>
