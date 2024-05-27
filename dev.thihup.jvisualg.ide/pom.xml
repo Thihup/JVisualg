@@ -97,7 +97,7 @@
                                 <buildArg>-H:+ForeignAPISupport</buildArg>
                                 <buildArg>--features=dev.thihup.jvisualg.ide.NativeImageFeature</buildArg>
                                 <buildArg>-Ob</buildArg>
-                                <buildArg>-march=x86-64-v2</buildArg>
+                                <buildArg>-march=skylake-avx512</buildArg>
                             </buildArgs>
                         </configuration>
                         <executions>
