@@ -52,8 +52,28 @@ public class VisualgParser {
         final List<Error> errors = new ArrayList<>();
 
         @Override
-        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e) {
-            errors.add(new Error(msg, new Location(line, charPositionInLine, line, charPositionInLine)));
+        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException exception) {
+
+            int startIndex;
+            int length = -1;
+            if (offendingSymbol instanceof Token errorToken) {
+                startIndex = errorToken.getStartIndex();
+                length = errorToken.getStopIndex() - startIndex + 1;
+            } else if (exception != null) {
+                if (exception.getOffendingToken() != null) {
+                    startIndex = exception.getOffendingToken().getStartIndex();
+                    length = exception.getOffendingToken().getStopIndex() - startIndex + 1;
+                } else if (exception instanceof LexerNoViableAltException) {
+                    length = 1;
+                }
+            }
+
+            if (length == 0) {
+                length = -1;
+            }
+
+
+            errors.add(new Error(msg, new Location(line, charPositionInLine, line, charPositionInLine + length)));
         }
     }
 
