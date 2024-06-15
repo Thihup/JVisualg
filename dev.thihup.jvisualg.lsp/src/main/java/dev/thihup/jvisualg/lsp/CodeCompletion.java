@@ -11,8 +11,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-class CodeCompletion {
-    static final List<CompletionItem> HOLDER = Stream.of(defaultFunctions(), keywords(), snippets()).flatMap(s -> s).toList();
+public class CodeCompletion {
+    public static final List<CompletionItem> HOLDER = Stream.of(defaultFunctions(), keywords(), snippets()).flatMap(s -> s).toList();
 
     private static Stream<CompletionItem> defaultFunctions() {
         return TypeChecker.DEFAULT_GLOBAL_SCOPE.functions()
@@ -41,13 +41,13 @@ class CodeCompletion {
                         Map.entry("!", """
                                 algoritmo "${0:semnome}"
                                 inicio
-                                    $1
+                                    ${1}
                                 fimalgoritmo
                                 """),
                         Map.entry("#", """
-                                // Algoritmo : $0
-                                // Função : $1
-                                // Autor : $2
+                                // Algoritmo : ${0}
+                                // Função : ${1}
+                                // Autor : ${2}
                                 // Data : ${3}
                                 """),
                         Map.entry("ale", "aleatorio"),
@@ -56,62 +56,62 @@ class CodeCompletion {
                         Map.entry("arq", "arquivo"),
                         Map.entry("cof", "cronometro off"),
                         Map.entry("con", "cronometro on"),
-                        Map.entry("dcc", "var $0 :caractere"),
-                        Map.entry("dcl", "var $0 :logico"),
-                        Map.entry("dcr", "var $0 :real"),
+                        Map.entry("dcc", "var ${0} :caractere"),
+                        Map.entry("dcl", "var ${0} :logico"),
+                        Map.entry("dcr", "var ${0} :real"),
                         Map.entry("deb", "debug"),
                         Map.entry("eof", "eco off"),
                         Map.entry("eon", "eco on"),
                         Map.entry("esc", "escreva"),
                         Map.entry("escl", """
-                                escolha $0 faca
+                                escolha ${0} faca
                                 caso
-                                    $1
+                                    ${1}
                                 fimescolha"""),
                         Map.entry("esco", """
-                                escolha $0 faca
-                                caso $1
-                                    $2
+                                escolha ${0} faca
+                                caso ${1}
+                                    ${2}
                                 outrocaso
-                                    $3
+                                    ${3}
                                 fimescolha"""),
                         Map.entry("enq", """
-                                enquanto $0 faca
-                                    $1
+                                enquanto ${0} faca
+                                    ${1}
                                 fimenquanto"""),
                         Map.entry("fal", "fimalgoritmo"),
                         Map.entry("ini", "inicio"),
                         Map.entry("int", "interrompa"),
                         Map.entry("lep", "leia"),
                         Map.entry("par", """
-                                para $0 de ${1:1} ate $2 faca
-                                    $3
+                                para ${0} de ${1:1} ate ${2} faca
+                                    ${3}
                                 fimpara"""),
                         Map.entry("parp", """
-                                para $0 de ${1:1} ate $2 passo $3 faca
-                                    $4
+                                para ${0} de ${1:1} ate ${2} passo ${3} faca
+                                    ${4}
                                 fimpara"""),
                         Map.entry("rep", """
                                 repita
-                                    $0
-                                ate $1"""),
+                                    ${0}
+                                ate ${1}"""),
                         Map.entry("repf", """
                                 repita
-                                    $0
+                                    ${0}
                                 fimrepita"""),
                         Map.entry("see", """
-                                se $0 entao
-                                    $1
+                                se ${0} entao
+                                    ${1}
                                 fimse"""),
                         Map.entry("ses", """
-                                se $0 entao
-                                    $1
+                                se ${0} entao
+                                    ${1}
                                 senao
-                                    $2
+                                    ${2}
                                 fimse"""),
                         Map.entry("tim", """
                                 timer on
-                                $0
+                                ${0}
                                 timer off"""),
                         Map.entry("tof", "timer off"),
                         Map.entry("ton", "timer on")

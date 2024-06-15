@@ -7,14 +7,12 @@ import dev.thihup.jvisualg.frontend.Error;
 import dev.thihup.jvisualg.frontend.TypeCheckerResult;
 import dev.thihup.jvisualg.frontend.VisualgParser;
 import dev.thihup.jvisualg.interpreter.*;
+import dev.thihup.jvisualg.lsp.CodeCompletion;
+import org.fife.rsta.ui.search.*;
+import org.fife.ui.autocomplete.*;
 import org.fife.ui.rsyntaxtextarea.*;
-import org.fife.ui.rsyntaxtextarea.parser.AbstractParser;
-import org.fife.ui.rsyntaxtextarea.parser.DefaultParseResult;
-import org.fife.ui.rsyntaxtextarea.parser.DefaultParserNotice;
-import org.fife.ui.rsyntaxtextarea.parser.ParseResult;
-import org.fife.ui.rtextarea.GutterIconInfo;
-import org.fife.ui.rtextarea.RTextArea;
-import org.fife.ui.rtextarea.RTextScrollPane;
+import org.fife.ui.rsyntaxtextarea.parser.*;
+import org.fife.ui.rtextarea.*;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -29,16 +27,22 @@ import java.awt.print.PrinterException;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class SwingIDE extends JFrame {
 
+    public static final String TEXT_X_VISUALG = "text/x-visualg";
+    public static final FlatAbstractIcon DEBUG_ICON = new FlatAbstractIcon(10, 10, Color.RED) {
+        @Override
+        protected void paintIcon(Component component, Graphics2D graphics2D) {
+            graphics2D.fillOval(0, 0, 10, 10);
+        }
+    };
     private final TextEditorPane textArea;
     private final DefaultTableModel debugTable;
 
@@ -48,7 +52,7 @@ public class SwingIDE extends JFrame {
     private final JTextArea dosContent = new JTextArea();
 
     private final Interpreter interpreter;
-    private final Map<Integer, GutterIconInfo> breakpointLines = new HashMap<>();
+    private final List<GutterIconInfo> breakpointLines = new ArrayList<>();
 
 
     private Consumer<String> callback;
@@ -70,24 +74,34 @@ public class SwingIDE extends JFrame {
             }
         });
 
-        interpreter = new Interpreter(new IO(this::readVariable, this::handleOutputEvent), programState -> {
+        interpreter = new Interpreter(new IO(this::readVariable, this::handleOutputEvent),
+        programState ->
             SwingUtilities.invokeLater(() -> {
                 updateDebugArea(programState);
                 highlightCurrentLine(programState.lineNumber());
-            });
-        });
+            }));
 
         textArea = new TextEditorPane();
         resetTextArea();
         textArea.setRows(20);
         textArea.setColumns(60);
         AbstractTokenMakerFactory atmf = (AbstractTokenMakerFactory) TokenMakerFactory.getDefaultInstance();
-        atmf.putMapping("text/x-visualg", "dev.thihup.jvisualg.ide.VisualgTokenMaker");
-        textArea.setSyntaxEditingStyle("text/x-visualg");
+        atmf.putMapping(TEXT_X_VISUALG, VisualgTokenMaker.class.getName());
+        textArea.setSyntaxEditingStyle(TEXT_X_VISUALG);
         textArea.setCodeFoldingEnabled(false);
-        textArea.setBracketMatchingEnabled(false);
-        textArea.addParser(new TypeChecker());
+        textArea.setBracketMatchingEnabled(true);
+        textArea.setInsertPairedCharacters(true);
+        textArea.setAutoIndentEnabled(true);
+        textArea.setMarkOccurrences(true);
+        textArea.setMarkOccurrencesDelay(100);
 
+        textArea.addParser(new TypeChecker());
+        textArea.addParser(new TaskTagParser());
+
+        AutoCompletion autoCompletion = new AutoCompletion(createCompletionProvider());
+        autoCompletion.setAutoActivationEnabled(true);
+        autoCompletion.setAutoActivationDelay(400);
+        autoCompletion.install(textArea);
 
         InputMap inputMap = textArea.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = textArea.getActionMap();
@@ -97,13 +111,13 @@ public class SwingIDE extends JFrame {
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F9, 0), "startOrContinue");
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F7, 0), "stepDebugger");
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "handleEscape");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, KeyEvent.CTRL_DOWN_MASK), "showReplace");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK), "showReplace");
 
         actionMap.put("stopInterpreter", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (interpreter != null) {
-                    interpreter.stop();
-                }
+                interpreter.stop();
             }
         });
 
@@ -134,7 +148,7 @@ public class SwingIDE extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 switch (interpreter.state()) {
                     case InterpreterState.ForcedStop _, InterpreterState.CompletedExceptionally _,
-                         InterpreterState.CompletedSuccessfully _ -> dosWindow.hide();
+                         InterpreterState.CompletedSuccessfully _ -> dosWindow.setVisible(false);
                     default -> {
                     }
                 }
@@ -151,9 +165,33 @@ public class SwingIDE extends JFrame {
 
         JToolBar toolBar = createToolbar();
         add(toolBar, BorderLayout.NORTH);
-
         JSplitPane mainSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-        mainSplitPane.add(scrollPane);
+
+
+        SearchContext[] searchContexts = new SearchContext[1];
+        ReplaceToolBar replaceToolBar = new ReplaceToolBar(new ReplaceListener(() -> searchContexts));
+        searchContexts[0] = replaceToolBar.getSearchContext();
+
+
+        replaceToolBar.setVisible(false);
+
+        ErrorStrip es = new ErrorStrip(textArea);
+        es.setShowMarkedOccurrences(true);
+
+        JPanel temp = new JPanel(new BorderLayout());
+        temp.add(scrollPane);
+        temp.add(es, BorderLayout.LINE_END);
+        temp.add(replaceToolBar, BorderLayout.NORTH);
+        mainSplitPane.add(temp);
+
+        actionMap.put("showReplace", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                replaceToolBar.setVisible(!replaceToolBar.isVisible());
+                temp.revalidate();
+            }
+        });
+
         mainSplitPane.setDividerLocation(0.8);
 
         JSplitPane bottomSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
@@ -172,6 +210,24 @@ public class SwingIDE extends JFrame {
 
         setVisible(true);
 
+    }
+
+    private CompletionProvider createCompletionProvider() {
+        DefaultCompletionProvider defaultCompletionProvider = new DefaultCompletionProvider();
+
+        CodeCompletion.HOLDER
+            .stream()
+            .map(x -> switch (x.getKind()) {
+                case Function -> new FunctionCompletion(defaultCompletionProvider, x.getLabel(), "");
+                case Snippet -> new TemplateCompletion(defaultCompletionProvider, x.getLabel(), x.getLabel(), x.getInsertText());
+                case Keyword -> new BasicCompletion(defaultCompletionProvider, x.getLabel(), x.getDetail());
+                default -> null;
+
+            })
+            .filter(Objects::nonNull)
+            .forEach(defaultCompletionProvider::addCompletion);
+
+        return defaultCompletionProvider;
     }
 
     private void resetTextArea() {
@@ -393,20 +449,17 @@ public class SwingIDE extends JFrame {
     }
 
     private void handleBreakpointChange(int currentParagraph) {
-        if (breakpointLines.containsKey(currentParagraph)) {
-            scrollPane.getGutter().removeTrackingIcon(breakpointLines.remove(currentParagraph));
+        Optional<GutterIconInfo> first = breakpointLines.stream().filter(x -> x.getMarkedOffset() == currentParagraph).findFirst();
+        if (first.isPresent()) {
+            breakpointLines.remove(first.get());
+            scrollPane.getGutter().removeTrackingIcon(first.get());
             interpreter.removeBreakpoint(currentParagraph + 1);
 
         } else {
             interpreter.addBreakpoint(currentParagraph + 1);
 
             try {
-                breakpointLines.put(currentParagraph, scrollPane.getGutter().addLineTrackingIcon(currentParagraph, new FlatAbstractIcon(10, 10, Color.RED) {
-                    @Override
-                    protected void paintIcon(Component component, Graphics2D graphics2D) {
-                        graphics2D.fillOval(0, 0, 10, 10);
-                    }
-                }));
+                breakpointLines.add(scrollPane.getGutter().addLineTrackingIcon(currentParagraph, DEBUG_ICON));
             } catch (BadLocationException e) {
                 throw new RuntimeException(e);
             }
@@ -457,6 +510,9 @@ public class SwingIDE extends JFrame {
     }
 
     public record DebugState(String getEscopo, String getNome, String getTipo, String getValor) {
+        Object[] toTableValue() {
+            return new Object[] {getEscopo, getNome, getTipo, getValor};
+        }
     }
 
     private static String getVisualgType(Object object) {
@@ -502,9 +558,7 @@ public class SwingIDE extends JFrame {
             case String s -> consumer.accept(new DebugState(scope, variableName, visualgType, "\"" + s + "\""));
             case Integer _, Double _ ->
                     consumer.accept(new DebugState(scope, variableName, visualgType, variableValue.toString()));
-            case UserDefinedValue userDefinedValue -> {
-                userDefinedValue.values().forEach((fieldName, fieldValue) -> addDebug(consumer, fieldValue, scope, variableName + "." + fieldName));
-            }
+            case UserDefinedValue userDefinedValue -> userDefinedValue.values().forEach((fieldName, fieldValue) -> addDebug(consumer, fieldValue, scope, variableName + "." + fieldName));
             default -> {
             }
         }
@@ -524,21 +578,21 @@ public class SwingIDE extends JFrame {
         debugTable.setRowCount(0);
         appendOutput("Início da execução\n", ToWhere.OUTPUT, When.NOW);
         interpreter.reset();
-        breakpointLines.forEach((location, _) -> interpreter.addBreakpoint(location + 1));
+        breakpointLines.forEach((location) -> interpreter.addBreakpoint(location.getMarkedOffset() + 1));
 
         dosContent.setText("");
         dosWindow.setSize(320, 240);
-        dosWindow.show();
+        dosWindow.setVisible(true);
+        dosWindow.requestFocus();
     }
 
 
-    private Void handleExecutionError(Throwable e) {
+    private void handleExecutionError(Throwable e) {
         if (e.getCause() instanceof CancellationException) {
             appendOutput("\n*** Execução terminada pelo usuário.", ToWhere.DOS, When.LATER);
             appendOutput("\n*** Feche esta janela para retornar ao Visual.", ToWhere.DOS, When.LATER);
 
             appendOutput("\nExecução terminada pelo usuário.", ToWhere.OUTPUT, When.LATER);
-            return null;
         } else if (e.getCause() instanceof TypeException) {
             appendOutput(e.getCause().getMessage(), ToWhere.OUTPUT, When.LATER);
         } else if (e.getCause() != null) {
@@ -548,7 +602,6 @@ public class SwingIDE extends JFrame {
 
         appendOutput("\nExecução terminada por erro.", ToWhere.BOTH, When.LATER);
         appendOutput("\n>>> Fim da execução do programa !", ToWhere.DOS, When.LATER);
-        return null;
     }
 
     private void startExecution(InterpreterState interpreterState) {
@@ -563,9 +616,7 @@ public class SwingIDE extends JFrame {
 
     private void handleStartOrContinue() {
         switch (interpreter.state()) {
-            case InterpreterState.PausedDebug _ -> {
-                interpreter.continueExecution();
-            }
+            case InterpreterState.PausedDebug _ -> interpreter.continueExecution();
             case InterpreterState.NotStarted _, InterpreterState.ForcedStop _,
                  InterpreterState.CompletedExceptionally _, InterpreterState.CompletedSuccessfully _ -> {
                 resetExecution();
@@ -580,14 +631,13 @@ public class SwingIDE extends JFrame {
         debugTable.setRowCount(0);
 
         programState.stack().entrySet().stream()
-                .mapMulti((Map.Entry<String, Map<String, Object>> entry, Consumer<DebugState> consumer) -> {
-                    entry.getValue().forEach((variableName, variableValue) -> {
+                .mapMulti((Map.Entry<String, Map<String, Object>> entry, Consumer<DebugState> consumer) -> entry.getValue()
+                    .forEach((variableName, variableValue) -> {
                         String scopeName = entry.getKey().toUpperCase();
                         String variableNameUpperCase = variableName.toUpperCase();
                         addDebug(consumer, variableValue, scopeName, variableNameUpperCase);
-                    });
-                })
-                .map(x -> new Object[]{x.getEscopo(), x.getNome(), x.getTipo(), x.getValor()})
+                    }))
+                .map(DebugState::toTableValue)
                 .forEach(debugTable::addRow);
     }
 
@@ -620,6 +670,27 @@ public class SwingIDE extends JFrame {
             }
             parseResult.setParseTime(System.currentTimeMillis() - start);
             return parseResult;
+        }
+    }
+
+    private class ReplaceListener implements SearchListener {
+        private final Supplier<SearchContext[]> searchContext;
+
+        public ReplaceListener(Supplier<SearchContext[]> searchContext) {
+            this.searchContext = searchContext;
+        }
+
+        @Override
+        public void searchEvent(SearchEvent searchEvent) {
+            switch (searchEvent.getType()) {
+                case FIND -> SearchEngine.find(textArea, searchContext.get()[0]);
+                case REPLACE -> SearchEngine.replace(textArea, searchContext.get()[0]);
+            }
+        }
+
+        @Override
+        public String getSelectedText() {
+            return textArea.getSelectedText();
         }
     }
 }

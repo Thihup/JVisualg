@@ -9,7 +9,7 @@ import java.util.stream.Stream;
 class SyntaxHighlight {
 
     static final List<String> FUNCTIONS = List.of(
-            "abs", "arccos", "arcsen", "arctan", "asc", "carac", "caracpnum", "compr", "copia", "cos", "cotan", "exp", "grauprad", "int", "log", "logn", "maiusc", "minusc", "numpcarac", "pos", "pi", "quad", "radpgrau", "raizq", "rand", "randi", "sen", "tan"
+            "abs", "arccos", "arcsen", "arctan", "asc", "carac", "caracpnum", "compr", "copia", "cos", "cotan", "exp", "grauprad", "int", "log", "logn", "maiusc", "minusc", "mudacor", "numpcarac", "pos", "pi", "quad", "radpgrau", "raizq", "rand", "randi", "sen", "tan"
     );
 
     static final List<String> KEYWORDS = List.of(
