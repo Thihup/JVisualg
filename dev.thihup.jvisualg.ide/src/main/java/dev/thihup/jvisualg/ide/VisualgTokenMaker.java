@@ -1,6 +1,7 @@
 package dev.thihup.jvisualg.ide;
 
 import de.tisoft.rsyntaxtextarea.modes.antlr.AntlrTokenMaker;
+import de.tisoft.rsyntaxtextarea.modes.antlr.MultiLineTokenInfo;
 import dev.thihup.jvisualg.frontend.impl.antlr.VisuAlgLexer;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.Lexer;
@@ -16,6 +17,10 @@ public class VisualgTokenMaker extends AntlrTokenMaker {
 
     static {
         SyntaxHighlight.FUNCTIONS.forEach(x -> TOKEN_MAP.put(x, TokenTypes.FUNCTION));
+    }
+
+    public VisualgTokenMaker() {
+        super(new MultiLineTokenInfo(0, Token.COMMENT_MULTILINE, "{", "}"));
     }
 
     @Override
@@ -94,6 +99,8 @@ public class VisualgTokenMaker extends AntlrTokenMaker {
             case VisuAlgLexer.RANGE -> Token.OPERATOR;
             case VisuAlgLexer.REAL_LITERAL -> Token.LITERAL_NUMBER_FLOAT;
             case VisuAlgLexer.STRING -> Token.LITERAL_STRING_DOUBLE_QUOTE;
+            case VisuAlgLexer.UNCLOSED_STRING -> Token.ERROR_STRING_DOUBLE;
+            case VisuAlgLexer.ERROR -> Token.ERROR_IDENTIFIER;
             case VisuAlgLexer.VERDADEIRO -> Token.LITERAL_BOOLEAN;
             case VisuAlgLexer.FALSO -> Token.LITERAL_BOOLEAN;
             case VisuAlgLexer.ADD -> Token.OPERATOR;
@@ -123,10 +130,29 @@ public class VisualgTokenMaker extends AntlrTokenMaker {
             case VisuAlgLexer.RBRACK -> Token.SEPARATOR;
             case VisuAlgLexer.DOT -> Token.OPERATOR;
             case VisuAlgLexer.ID -> Token.IDENTIFIER;
-            case VisuAlgLexer.COMMENT -> Token.COMMENT_EOL;
+            case VisuAlgLexer.COMMENT -> Token.COMMENT_MULTILINE;
+            case VisuAlgLexer.LINE_COMMENT -> Token.COMMENT_EOL;
             case VisuAlgLexer.WS -> Token.WHITESPACE;
             default -> throw new IllegalStateException();
         };
+    }
+
+    @Override
+    public boolean getShouldIndentNextLineAfter(Token token) {
+        if (token == null) {
+            return false;
+        }
+        String lexeme = token.getLexeme();
+        org.antlr.v4.runtime.Token antlrToken = createLexer(lexeme).nextToken();
+        return switch (antlrToken.getType()) {
+            case VisuAlgLexer.PARA, VisuAlgLexer.REPITA, VisuAlgLexer.INICIO, VisuAlgLexer.FACA, VisuAlgLexer.ENTAO -> true;
+            default -> false;
+        };
+    }
+
+    @Override
+    public boolean getCurlyBracesDenoteCodeBlocks(int languageIndex) {
+        return true;
     }
 
     @Override

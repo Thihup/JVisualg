@@ -91,8 +91,14 @@ public class TypeChecker {
             }
         }
 
+        sealed interface Subprogram extends Declaration {
+            String name();
+            SequencedMap<String, Variable> parameters();
+            Location location();
+        }
+
         record Function(String name, Type returnType, SequencedMap<String, Variable> parameters,
-                        Location location) implements Declaration {
+                        Location location) implements Subprogram {
             public Function {
                 name = name.toLowerCase();
             }
@@ -103,7 +109,7 @@ public class TypeChecker {
         }
 
         record Procedure(String name, SequencedMap<String, Variable> parameters,
-                         Location location) implements Declaration {
+                         Location location) implements Subprogram {
             public Procedure {
                 name = name.toLowerCase();
             }

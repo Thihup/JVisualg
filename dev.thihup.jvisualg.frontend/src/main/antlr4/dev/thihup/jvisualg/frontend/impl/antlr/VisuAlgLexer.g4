@@ -65,6 +65,9 @@ REAL_LITERAL : [0-9]+ '.' [0-9]*;
 // String literals
 STRING : '"' (~["\r\n] | '\\"' | '\\\\')* '"';
 
+// Unterminated string literal
+UNCLOSED_STRING : '"' (~["\r\n] | '\\"' | '\\\\')* -> channel(HIDDEN);
+
 // Logical literals
 VERDADEIRO : 'verdadeiro';
 FALSO : 'falso';
@@ -106,7 +109,15 @@ DOT : '.';
 ID : [a-z_][a-z0-9_]*;
 
 // Comments
-COMMENT : '//' ~[\r\n]* -> channel(HIDDEN);
+COMMENT: '{' .*? '}' -> channel(HIDDEN);
+LINE_COMMENT : '//' ~[\r\n]* -> channel(HIDDEN);
 
 // Whitespace
 WS : [ \t\r\n]+ -> channel(HIDDEN);
+
+// Error handling
+ERROR : . ;
+
+// Fragment to avoid confusion with other token rules
+fragment DIGIT : [0-9];
+fragment LETTER : [a-z_];
