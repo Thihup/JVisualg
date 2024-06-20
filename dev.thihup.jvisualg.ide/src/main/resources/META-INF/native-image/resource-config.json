@@ -137,5 +137,14 @@
   }, {
     "name":"sun.util.resources.cldr.CurrencyNames",
     "locales":["pt", "pt-BR", "und"]
+  }, {
+    "name": "org.fife.rsta.ui.search.Search",
+    "locales": ["pt-BR"]
+  }, {
+    "name": "org.fife.rsta.ui.search.SearchToolBar",
+    "locales": ["pt-BR"]
+  }, {
+    "name": "org.fife.ui.rsyntaxtextarea.ErrorStrip",
+    "locales": ["pt-BR"]
   }]
 }
