@@ -2,10 +2,6 @@ package dev.thihup.jvisualg.ide;
 
 import com.formdev.flatlaf.FlatLightLaf;
 import com.formdev.flatlaf.icons.FlatAbstractIcon;
-import dev.thihup.jvisualg.frontend.ASTResult;
-import dev.thihup.jvisualg.frontend.Error;
-import dev.thihup.jvisualg.frontend.TypeCheckerResult;
-import dev.thihup.jvisualg.frontend.VisualgParser;
 import dev.thihup.jvisualg.interpreter.*;
 import dev.thihup.jvisualg.lsp.CodeCompletion;
 import org.fife.rsta.ui.search.*;
@@ -19,20 +15,15 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.BadLocationException;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.awt.event.*;
 import java.awt.print.PrinterException;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 public class SwingIDE extends JFrame {
 
@@ -65,13 +56,30 @@ public class SwingIDE extends JFrame {
 
         dosContent.setBackground(Color.BLACK);
         dosContent.setForeground(Color.WHITE);
-        dosContent.setFont(Font.getFont(Font.MONOSPACED));
+        Font monospacedFont = new Font("Consolas", Font.PLAIN, 12);
+        dosContent.setFont(monospacedFont);
+        dosContent.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER){
+                    try {
+                        callback.accept(dosContent.getText(lastPromptPosition, dosContent.getText().length()));
+                        lastPromptPosition = dosContent.getText().length();
+                    } catch (BadLocationException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+        });
         dosWindow.add(dosContent);
+        dosWindow.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         dosWindow.addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosed(WindowEvent e) {
+            public void windowClosing(WindowEvent e) {
+                interpreter.stop();
                 dosWindow.setVisible(false);
             }
+
         });
 
         interpreter = new Interpreter(new IO(this::readVariable, this::handleOutputEvent),
@@ -169,7 +177,7 @@ public class SwingIDE extends JFrame {
 
 
         SearchContext[] searchContexts = new SearchContext[1];
-        ReplaceToolBar replaceToolBar = new ReplaceToolBar(new ReplaceListener(() -> searchContexts));
+        ReplaceToolBar replaceToolBar = new ReplaceToolBar(new ReplaceListener(textArea, () -> searchContexts));
         searchContexts[0] = replaceToolBar.getSearchContext();
 
 
@@ -202,6 +210,7 @@ public class SwingIDE extends JFrame {
         bottomSplitPane.setLeftComponent(debugScrollPane);
 
         outputArea = new JTextArea();
+        outputArea.setFont(monospacedFont);
         JScrollPane outputScrollPane = new JScrollPane(outputArea);
         bottomSplitPane.setRightComponent(outputScrollPane);
 
@@ -588,11 +597,12 @@ public class SwingIDE extends JFrame {
 
 
     private void handleExecutionError(Throwable e) {
-        if (e.getCause() instanceof CancellationException) {
+        if (e.getCause() instanceof InterruptedException) {
             appendOutput("\n*** Execução terminada pelo usuário.", ToWhere.DOS, When.LATER);
             appendOutput("\n*** Feche esta janela para retornar ao Visual.", ToWhere.DOS, When.LATER);
 
             appendOutput("\nExecução terminada pelo usuário.", ToWhere.OUTPUT, When.LATER);
+            return;
         } else if (e.getCause() instanceof TypeException) {
             appendOutput(e.getCause().getMessage(), ToWhere.OUTPUT, When.LATER);
         } else if (e.getCause() != null) {
@@ -641,56 +651,4 @@ public class SwingIDE extends JFrame {
                 .forEach(debugTable::addRow);
     }
 
-    private static class TypeChecker extends AbstractParser {
-        @Override
-        public ParseResult parse(RSyntaxDocument doc, String style) {
-            DefaultParseResult parseResult = new DefaultParseResult(this);
-            long start = System.currentTimeMillis();
-            parseResult.setParsedLines(0, doc.getDefaultRootElement().getElementCount());
-
-            try {
-                String text = doc.getText(0, doc.getLength());
-                ASTResult astResult = VisualgParser.parse(text);
-
-                List<Error> errors = astResult.errors();
-
-                astResult.node()
-                        .map(dev.thihup.jvisualg.frontend.TypeChecker::semanticAnalysis)
-                        .map(TypeCheckerResult::errors)
-                        .ifPresent(errors::addAll);
-
-                errors.stream()
-                        .map(x -> {
-                            int offset = doc.getTokenListForLine(x.location().startLine() - 1).getOffset();
-                            return new DefaultParserNotice(this, x.message(), x.location().startLine() - 1, offset + x.location().startColumn(), x.location().endColumn() - x.location().startColumn() + 1);
-                        })
-                        .forEach(parseResult::addNotice);
-            } catch (Exception e) {
-                parseResult.setError(e);
-            }
-            parseResult.setParseTime(System.currentTimeMillis() - start);
-            return parseResult;
-        }
-    }
-
-    private class ReplaceListener implements SearchListener {
-        private final Supplier<SearchContext[]> searchContext;
-
-        public ReplaceListener(Supplier<SearchContext[]> searchContext) {
-            this.searchContext = searchContext;
-        }
-
-        @Override
-        public void searchEvent(SearchEvent searchEvent) {
-            switch (searchEvent.getType()) {
-                case FIND -> SearchEngine.find(textArea, searchContext.get()[0]);
-                case REPLACE -> SearchEngine.replace(textArea, searchContext.get()[0]);
-            }
-        }
-
-        @Override
-        public String getSelectedText() {
-            return textArea.getSelectedText();
-        }
-    }
 }

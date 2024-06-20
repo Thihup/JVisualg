@@ -42,6 +42,7 @@ public class Interpreter {
     private InputState inputState;
     private boolean eco = false;
     private TreeMap<Integer, Node> lineToAstNode;
+    private Thread thread;
 
 
     public Interpreter(IO io, @Nullable Consumer<ProgramState> debuggerCallback) {
@@ -70,6 +71,7 @@ public class Interpreter {
         stack.clear();
         breakpoints.clear();
         state = InterpreterState.NotStarted.INSTANCE;
+        thread = null;
     }
 
     public InterpreterState state() {
@@ -81,6 +83,11 @@ public class Interpreter {
     }
 
     public void runWithState(String code, InterpreterState state) {
+        thread = Thread.currentThread();
+        startWithState(code, state);
+    }
+
+    private void startWithState(String code, InterpreterState state) {
         try {
             this.state = state;
             ASTResult parse = VisualgParser.parse(code);
@@ -89,7 +96,7 @@ public class Interpreter {
                 Node node = optionalNode.get();
                 lineToAstNode = node.visitChildren()
                         .collect(Collectors.toMap(node2 -> node2.location().orElse(Location.EMPTY).startLine(),
-                        Function.identity(), (_, b) -> b, TreeMap::new));
+                                Function.identity(), (a, b) -> a, TreeMap::new));
 
                 this.run(node);
             } else {
@@ -118,7 +125,8 @@ public class Interpreter {
                     return;
                 }
                 case InterpreterState.PausedDebug(int lineNumber)
-                    when lineToAstNode.containsKey(lineNumber) && currentLineNumber == lineNumber -> handleDebugCommand(node);
+                        when lineToAstNode.containsKey(lineNumber) && currentLineNumber == lineNumber ->
+                        handleDebugCommand(node);
                 case InterpreterState.PausedDebug e -> {
                     handleDebugCommand(node);
                     setNextLineDebug(e);
@@ -126,7 +134,7 @@ public class Interpreter {
                 case InterpreterState.CompletedExceptionally _,
                      InterpreterState.NotStarted _ -> {
                 }
-                case InterpreterState.Running _ when  breakpoints.contains(currentLineNumber)
+                case InterpreterState.Running _ when breakpoints.contains(currentLineNumber)
                         && lineToAstNode.containsKey(currentLineNumber) -> {
                     state = new InterpreterState.PausedDebug(currentLineNumber);
                     handleDebugCommand(node);
@@ -149,7 +157,7 @@ public class Interpreter {
                 case Node.TypeNode _ -> throw new UnsupportedOperationException("TypeNode not implemented");
             }
         } catch (IOException | InterruptedException | BrokenBarrierException e) {
-            state = new InterpreterState.CompletedExceptionally(e);
+            throw new RuntimeException(e);
         } catch (StopExecutionException _) {
             state = InterpreterState.CompletedSuccessfully.INSTANCE;
         } catch (IndexOutOfBoundsException e) {
@@ -163,6 +171,7 @@ public class Interpreter {
 
     public void stop() {
         state = InterpreterState.ForcedStop.INSTANCE;
+        thread.interrupt();
     }
 
     private void runDeclaration(Node.DeclarationNode declarationNode) {
@@ -202,8 +211,8 @@ public class Interpreter {
 
     private void setNextLineDebug(InterpreterState.PausedDebug e) {
         state = Optional.ofNullable(lineToAstNode.higherKey(e.lineNumber()))
-            .<InterpreterState>map(InterpreterState.PausedDebug::new)
-            .orElse(InterpreterState.Running.INSTANCE);
+                .<InterpreterState>map(InterpreterState.PausedDebug::new)
+                .orElse(InterpreterState.Running.INSTANCE);
     }
 
     public void continueExecution() {
@@ -517,7 +526,7 @@ public class Interpreter {
     }
 
     private Object readValue(InputRequestValue inputRequest) {
-        InputValue inputValue = inputState.generateValue(inputRequest).orElseThrow();
+        InputValue inputValue = inputState.generateValue(inputRequest);
         Object value = switch (inputValue) {
             case InputValue.InteiroValue(var value1) -> value1;
             case InputValue.RealValue(var value1) -> value1;
