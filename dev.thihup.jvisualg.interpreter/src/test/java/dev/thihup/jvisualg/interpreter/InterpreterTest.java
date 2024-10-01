@@ -515,7 +515,7 @@ class InterpreterTest extends ExamplesBase {
     void testExamplesErrors(FileAndError file) throws Throwable {
         StringBuilder stringBuilder = new StringBuilder();
         IO io = new IO(
-            _ -> CompletableFuture.completedFuture(Optional.empty()),
+            _ -> CompletableFuture.failedFuture(new UnsupportedOperationException()),
             a -> {
                 switch (a) {
                     case OutputEvent.Text(String t) -> stringBuilder.append(t);
@@ -545,7 +545,7 @@ class InterpreterTest extends ExamplesBase {
                             @CartesianTest.Enum(Types.class) Types type2) throws Throwable {
         StringBuilder stringBuilder = new StringBuilder();
         IO io = new IO(
-                _ -> CompletableFuture.completedFuture(Optional.empty()),
+                _ -> CompletableFuture.failedFuture(new UnsupportedOperationException()),
                 a -> {
                     switch (a) {
                         case OutputEvent.Text(String t) -> stringBuilder.append(t);
@@ -581,7 +581,7 @@ class InterpreterTest extends ExamplesBase {
                             @CartesianTest.Enum(Types.class) Types type) throws Throwable {
         StringBuilder stringBuilder = new StringBuilder();
         IO io = new IO(
-                _ -> CompletableFuture.completedFuture(Optional.empty()),
+                _ -> CompletableFuture.failedFuture(new UnsupportedOperationException()),
                 a -> {
                     switch (a) {
                         case OutputEvent.Text(String t) -> stringBuilder.append(t);
