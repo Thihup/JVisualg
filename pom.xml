@@ -26,7 +26,7 @@
         <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
-            <version>0.3.0</version>
+            <version>1.0.0</version>
         </dependency>
         <dependency>
             <groupId>org.junit-pioneer</groupId>
@@ -53,6 +53,13 @@
                 <configuration>
                     <argLine>--enable-preview</argLine>
                 </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                        <version>9.7</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>

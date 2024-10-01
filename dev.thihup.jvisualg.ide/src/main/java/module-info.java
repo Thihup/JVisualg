@@ -1,3 +1,6 @@
+import org.jspecify.annotations.NullMarked;
+
+@NullMarked
 module dev.thihup.jvisualg.ide {
     requires java.desktop;
 
@@ -13,6 +16,7 @@ module dev.thihup.jvisualg.ide {
     requires dev.thihup.jvisualg.lsp;
     requires dev.thihup.jvisualg.frontend;
     requires org.antlr.antlr4.runtime;
+    requires static org.jspecify;
 
     exports dev.thihup.jvisualg.ide to org.fife.RSyntaxTextArea;
 }
