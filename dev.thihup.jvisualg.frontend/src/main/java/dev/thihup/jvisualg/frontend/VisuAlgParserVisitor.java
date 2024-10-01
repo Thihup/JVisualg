@@ -259,8 +259,11 @@ class VisuAlgParserVisitor extends VisuAlgParserBaseVisitor<Node> {
         return ctx.children
             .stream()
             .map(this::visit)
-            .filter(x -> x instanceof ExpressionNode)
-            .map(x -> (ExpressionNode) x)
+                .<ExpressionNode>mapMulti((node, consumer) -> {
+                    if (node instanceof ExpressionNode expressionNode) {
+                        consumer.accept(expressionNode);
+                    }
+                })
             .reduce((result, element) -> switch (element) {
                 case ArrayAccessNode(_, CompundNode<ExpressionNode> indexes, var location) ->
                         new ArrayAccessNode(result, indexes, location);
