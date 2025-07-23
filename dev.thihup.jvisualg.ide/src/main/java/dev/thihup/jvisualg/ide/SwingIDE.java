@@ -3,6 +3,7 @@ package dev.thihup.jvisualg.ide;
 import com.formdev.flatlaf.FlatLightLaf;
 import com.formdev.flatlaf.icons.FlatAbstractIcon;
 import dev.thihup.jvisualg.interpreter.*;
+import dev.thihup.jvisualg.interpreter.IO;
 import dev.thihup.jvisualg.lsp.CodeCompletion;
 import org.fife.rsta.ui.search.*;
 import org.fife.ui.autocomplete.*;
