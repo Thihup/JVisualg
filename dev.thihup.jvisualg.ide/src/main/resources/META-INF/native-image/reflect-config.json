@@ -591,5 +591,9 @@
 {
   "name":"sun.security.provider.SHA2$SHA256",
   "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name": "sun.font.Font2D",
+  "methods": [{"name":"charToGlyphRaw", "parameterTypes":["int"]}]
 }
 ]
